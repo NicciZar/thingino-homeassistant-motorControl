@@ -16,6 +16,14 @@ Custom Home Assistant integration for controlling a camera motor over local API 
   - `thingino_motor_control.get_heartbeat`
 - Sends local HTTP `GET` requests to your camera API
 
+## Compatibility and Credits
+
+- This addon is only confirmed to work with Thingino firmware for WUUK Y0510 installed from this exact installer path:
+  https://github.com/wltechblog/thingino-installers/tree/main/wuuk-y0510
+- Other camera models/installer paths or non-Thingino firmware may work, but are currently unverified.
+- Firmware credit: Thingino open-source firmware project and contributors:
+  https://github.com/themactep/thingino-firmware
+
 ## Authentication support
 
 This integration supports both methods:
