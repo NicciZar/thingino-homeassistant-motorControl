@@ -8,8 +8,12 @@ function normalizeIrMode(value) {
   return value === IR_MODE_NIGHT ? IR_MODE_NIGHT : IR_MODE_DAY;
 }
 
-function nextIrMode(mode) {
-  return normalizeIrMode(mode) === IR_MODE_DAY ? IR_MODE_NIGHT : IR_MODE_DAY;
+function isIrEnabledFromMode(mode) {
+  return normalizeIrMode(mode) === IR_MODE_NIGHT;
+}
+
+function modeFromIrEnabled(enabled) {
+  return enabled ? IR_MODE_NIGHT : IR_MODE_DAY;
 }
 
 function toPositiveNumberOrNull(value) {
@@ -39,6 +43,7 @@ class ThinginoMotorControlCard extends HTMLElement {
       host: "192.168.178.118",
       show_title: true,
       step_size: DEFAULT_STEP_SIZE,
+      show_heartbeat: false,
     };
   }
 
@@ -48,7 +53,10 @@ class ThinginoMotorControlCard extends HTMLElement {
     this._config = null;
     this._hass = null;
     this._compactMode = false;
-    this._irMode = IR_MODE_DAY;
+    this._irEnabled = false;
+    this._heartbeatData = null;
+    this._heartbeatLoading = false;
+    this._heartbeatError = null;
   }
 
   setConfig(config) {
@@ -65,24 +73,51 @@ class ThinginoMotorControlCard extends HTMLElement {
       title: defaultTitle,
       show_title: true,
       step_size: DEFAULT_STEP_SIZE,
+      show_heartbeat: false,
+      show_heartbeat_time_now: true,
+      show_heartbeat_timezone: true,
+      show_heartbeat_memory: true,
+      show_heartbeat_overlay: true,
+      show_heartbeat_extras: true,
+      show_heartbeat_daynight: true,
+      show_heartbeat_uptime: true,
       ...config,
       compact: compactMode,
     };
     this._compactMode = compactMode;
-    this._irMode = normalizeIrMode(this._config.ir_mode);
+    this._irEnabled = isIrEnabledFromMode(this._config.ir_mode);
+    this._heartbeatData = null;
+    this._heartbeatError = null;
 
     this._render();
+
+    if (this._config.show_heartbeat && this._hass) {
+      this._fetchHeartbeat();
+    }
   }
 
   set hass(hass) {
     this._hass = hass;
+
+    if (
+      this._config &&
+      this._config.show_heartbeat &&
+      !this._heartbeatData &&
+      !this._heartbeatLoading
+    ) {
+      this._fetchHeartbeat();
+    }
   }
 
   getCardSize() {
+    const heartbeatBonus = this._config && this._config.show_heartbeat ? 2 : 0;
+
     if (this._compactMode) {
-      return this._config && this._config.show_title === false ? 3 : 4;
+      const base = this._config && this._config.show_title === false ? 3 : 4;
+      return base + heartbeatBonus;
     }
-    return 5;
+
+    return 5 + heartbeatBonus;
   }
 
   _targetData() {
@@ -135,19 +170,90 @@ class ThinginoMotorControlCard extends HTMLElement {
     this._hass.callService("thingino_motor_control", serviceName, data);
   }
 
-  _callIrMode(irMode) {
+  _setIrEnabled(enabled) {
     if (!this._hass || !this._config) {
       return;
     }
+
+    const irMode = modeFromIrEnabled(enabled);
 
     this._hass.callService("thingino_motor_control", "set_ircut", {
       ...this._targetData(),
       ir_mode: irMode,
     });
 
-    // Keep the UI toggle state in sync with the last command sent.
-    this._irMode = irMode;
+    // Keep the switch state in sync with the last command sent.
+    this._irEnabled = enabled;
     this._render();
+  }
+
+  _extractServiceResponse(result) {
+    if (!result || typeof result !== "object") {
+      return null;
+    }
+
+    if (result.service_response && typeof result.service_response === "object") {
+      return result.service_response;
+    }
+
+    if (result.response && typeof result.response === "object") {
+      return result.response;
+    }
+
+    if (
+      Array.isArray(result) &&
+      result[0] &&
+      typeof result[0] === "object" &&
+      result[0].service_response &&
+      typeof result[0].service_response === "object"
+    ) {
+      return result[0].service_response;
+    }
+
+    return result;
+  }
+
+  async _fetchHeartbeat() {
+    if (!this._hass || !this._config || this._heartbeatLoading) {
+      return;
+    }
+
+    this._heartbeatLoading = true;
+    this._heartbeatError = null;
+    this._render();
+
+    try {
+      const result = await this._hass.callService(
+        "thingino_motor_control",
+        "get_heartbeat",
+        this._targetData(),
+        undefined,
+        true
+      );
+      const payload = this._extractServiceResponse(result);
+      if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+        throw new Error("Camera heartbeat response was empty or invalid.");
+      }
+
+      this._heartbeatData = payload;
+      this._heartbeatError = null;
+    }
+    catch (err) {
+      this._heartbeatError = err?.message || String(err);
+    }
+    finally {
+      this._heartbeatLoading = false;
+      this._render();
+    }
+  }
+
+  _heartbeatValue(key) {
+    if (!this._heartbeatData || this._heartbeatData[key] === undefined) {
+      return "-";
+    }
+
+    const value = this._heartbeatData[key];
+    return value === null || value === "" ? "-" : String(value);
   }
 
   _render() {
@@ -164,13 +270,99 @@ class ThinginoMotorControlCard extends HTMLElement {
     const titleFont = this._compactMode ? "0.9rem" : "1rem";
     const subtitleFont = this._compactMode ? "0.75rem" : "0.8rem";
     const subtitleMargin = this._compactMode ? 8 : 12;
-    const irButtonFont = this._compactMode ? "0.75rem" : "0.8rem";
-    const irButtonPadding = this._compactMode ? "6px 8px" : "8px 10px";
-    const irNextMode = nextIrMode(this._irMode);
-    const irButtonIcon = irNextMode === IR_MODE_DAY
-      ? "mdi:white-balance-sunny"
-      : "mdi:weather-night";
-    const irButtonLabel = irNextMode === IR_MODE_DAY ? "Switch to Day" : "Switch to Night";
+    const irRowFont = this._compactMode ? "0.75rem" : "0.8rem";
+    const irIcon = this._irEnabled ? "mdi:weather-night" : "mdi:white-balance-sunny";
+    const irState = this._irEnabled ? "Enabled" : "Disabled";
+    const showHeartbeat = this._config.show_heartbeat === true;
+
+    if (
+      showHeartbeat &&
+      this._hass &&
+      !this._heartbeatData &&
+      !this._heartbeatLoading &&
+      !this._heartbeatError
+    ) {
+      this._fetchHeartbeat();
+    }
+
+    const heartbeatRows = [];
+    if (showHeartbeat) {
+      if (this._config.show_heartbeat_time_now !== false) {
+        heartbeatRows.push(["Time", this._heartbeatValue("time_now")]);
+      }
+      if (this._config.show_heartbeat_timezone !== false) {
+        heartbeatRows.push(["Timezone", this._heartbeatValue("timezone")]);
+      }
+      if (this._config.show_heartbeat_memory !== false) {
+        heartbeatRows.push(["Mem total", this._heartbeatValue("mem_total")]);
+        heartbeatRows.push(["Mem active", this._heartbeatValue("mem_active")]);
+        heartbeatRows.push(["Mem buffers", this._heartbeatValue("mem_buffers")]);
+        heartbeatRows.push(["Mem cached", this._heartbeatValue("mem_cached")]);
+        heartbeatRows.push(["Mem free", this._heartbeatValue("mem_free")]);
+      }
+      if (this._config.show_heartbeat_overlay !== false) {
+        heartbeatRows.push(["Overlay total", this._heartbeatValue("overlay_total")]);
+        heartbeatRows.push(["Overlay used", this._heartbeatValue("overlay_used")]);
+        heartbeatRows.push(["Overlay free", this._heartbeatValue("overlay_free")]);
+      }
+      if (this._config.show_heartbeat_extras !== false) {
+        heartbeatRows.push(["Extras total", this._heartbeatValue("extras_total")]);
+        heartbeatRows.push(["Extras used", this._heartbeatValue("extras_used")]);
+        heartbeatRows.push(["Extras free", this._heartbeatValue("extras_free")]);
+      }
+      if (this._config.show_heartbeat_daynight !== false) {
+        heartbeatRows.push(["Day/night value", this._heartbeatValue("daynight_value")]);
+      }
+      if (this._config.show_heartbeat_uptime !== false) {
+        heartbeatRows.push(["Uptime", this._heartbeatValue("uptime")]);
+      }
+    }
+
+    const heartbeatRowsHtml = heartbeatRows
+      .map(
+        ([label, value]) => `
+          <div class="heartbeat-row">
+            <span class="heartbeat-key">${label}</span>
+            <span class="heartbeat-value">${value}</span>
+          </div>
+        `
+      )
+      .join("");
+
+    let heartbeatBodyHtml = "";
+    if (showHeartbeat) {
+      if (this._heartbeatLoading) {
+        heartbeatBodyHtml = '<div class="heartbeat-note">Loading heartbeat...</div>';
+      }
+      else if (this._heartbeatError) {
+        heartbeatBodyHtml = `<div class="heartbeat-error">${this._heartbeatError}</div>`;
+      }
+      else if (!this._heartbeatData) {
+        heartbeatBodyHtml = '<div class="heartbeat-note">Heartbeat not loaded yet.</div>';
+      }
+      else if (heartbeatRowsHtml) {
+        heartbeatBodyHtml = heartbeatRowsHtml;
+      }
+      else {
+        heartbeatBodyHtml = '<div class="heartbeat-note">No heartbeat fields selected.</div>';
+      }
+    }
+
+    const heartbeatSectionHtml = showHeartbeat
+      ? `
+        <div class="heartbeat-panel">
+          <div class="heartbeat-header">
+            <span class="heartbeat-title">Heartbeat</span>
+            <button type="button" class="heartbeat-refresh" data-heartbeat-refresh="true" title="Refresh heartbeat">
+              Refresh
+            </button>
+          </div>
+          <div class="heartbeat-content">
+            ${heartbeatBodyHtml}
+          </div>
+        </div>
+      `
+      : "";
 
     const headerHtml = showTitle
       ? `<div class="title">${this._config.title}</div>
@@ -231,18 +423,100 @@ class ThinginoMotorControlCard extends HTMLElement {
           gap: ${controlGap}px;
         }
 
-        .ir-controls button {
+        .ir-switch {
           width: 100%;
-          height: auto;
-          padding: ${irButtonPadding};
+          display: grid;
+          grid-template-columns: 1fr auto;
+          align-items: center;
           border-radius: ${borderRadius}px;
+          background: var(--secondary-background-color);
+          padding: ${this._compactMode ? "6px 8px" : "8px 10px"};
+          font-size: ${irRowFont};
+          gap: 8px;
+        }
+
+        .ir-switch-label {
+          display: inline-flex;
+          align-items: center;
           gap: 6px;
-          font-size: ${irButtonFont};
           font-weight: 600;
         }
 
-        .ir-controls ha-icon {
+        .ir-switch-state {
+          color: var(--secondary-text-color);
+          font-size: ${this._compactMode ? "0.72rem" : "0.78rem"};
+          margin-left: 4px;
+        }
+
+        .ir-switch input[type="checkbox"] {
+          width: ${this._compactMode ? "16px" : "18px"};
+          height: ${this._compactMode ? "16px" : "18px"};
+          accent-color: var(--paper-item-icon-active-color, var(--accent-color));
+          cursor: pointer;
+        }
+
+        .ir-switch ha-icon {
           --mdc-icon-size: ${this._compactMode ? 16 : 18}px;
+        }
+
+        .heartbeat-panel {
+          border: 1px solid var(--divider-color);
+          border-radius: ${borderRadius}px;
+          margin-top: ${this._compactMode ? 6 : 8}px;
+          padding: ${this._compactMode ? "8px" : "10px"};
+          background: var(--card-background-color);
+        }
+
+        .heartbeat-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          margin-bottom: 8px;
+          gap: 8px;
+        }
+
+        .heartbeat-title {
+          font-size: ${this._compactMode ? "0.82rem" : "0.9rem"};
+          font-weight: 600;
+        }
+
+        .heartbeat-refresh {
+          width: auto;
+          height: auto;
+          padding: ${this._compactMode ? "4px 8px" : "5px 10px"};
+          border-radius: ${this._compactMode ? 8 : 10}px;
+          font-size: ${this._compactMode ? "0.72rem" : "0.78rem"};
+          font-weight: 600;
+        }
+
+        .heartbeat-content {
+          display: grid;
+          gap: 4px;
+        }
+
+        .heartbeat-row {
+          display: grid;
+          grid-template-columns: 1fr auto;
+          gap: 8px;
+          font-size: ${this._compactMode ? "0.72rem" : "0.78rem"};
+        }
+
+        .heartbeat-key {
+          color: var(--secondary-text-color);
+        }
+
+        .heartbeat-value {
+          font-family: monospace;
+        }
+
+        .heartbeat-note {
+          font-size: ${this._compactMode ? "0.72rem" : "0.78rem"};
+          color: var(--secondary-text-color);
+        }
+
+        .heartbeat-error {
+          font-size: ${this._compactMode ? "0.72rem" : "0.78rem"};
+          color: var(--error-color);
         }
 
         button:hover {
@@ -281,11 +555,21 @@ class ThinginoMotorControlCard extends HTMLElement {
           <div class="empty"></div>
         </div>
         <div class="ir-controls">
-          <button type="button" data-ir-toggle="true" title="Toggle IR mode">
-            <ha-icon icon="${irButtonIcon}"></ha-icon>
-            ${irButtonLabel}
-          </button>
+          <div class="ir-switch" title="Enable or disable IR night mode">
+            <label class="ir-switch-label" for="ir-enabled-input">
+              <ha-icon icon="${irIcon}"></ha-icon>
+              IR
+              <span class="ir-switch-state">${irState}</span>
+            </label>
+            <input
+              id="ir-enabled-input"
+              type="checkbox"
+              data-ir-enabled="true"
+              ${this._irEnabled ? "checked" : ""}
+            />
+          </div>
         </div>
+        ${heartbeatSectionHtml}
       </ha-card>
     `;
 
@@ -295,11 +579,19 @@ class ThinginoMotorControlCard extends HTMLElement {
       });
     });
 
-    this.shadowRoot.querySelectorAll("button[data-ir-toggle]").forEach((button) => {
-      button.addEventListener("click", () => {
-        this._callIrMode(nextIrMode(this._irMode));
+    this.shadowRoot.querySelectorAll('input[data-ir-enabled="true"]').forEach((input) => {
+      input.addEventListener("change", () => {
+        this._setIrEnabled(input.checked);
       });
     });
+
+    this.shadowRoot
+      .querySelectorAll('button[data-heartbeat-refresh="true"]')
+      .forEach((button) => {
+        button.addEventListener("click", () => {
+          this._fetchHeartbeat();
+        });
+      });
   }
 }
 
@@ -315,6 +607,7 @@ class ThinginoMotorControlCompactCard extends ThinginoMotorControlCard {
       host: "192.168.178.118",
       show_title: false,
       step_size: DEFAULT_STEP_SIZE,
+      show_heartbeat: false,
     };
   }
 
@@ -346,6 +639,14 @@ class ThinginoMotorControlCardEditor extends HTMLElement {
       title: defaultTitle,
       show_title: true,
       step_size: DEFAULT_STEP_SIZE,
+      show_heartbeat: false,
+      show_heartbeat_time_now: true,
+      show_heartbeat_timezone: true,
+      show_heartbeat_memory: true,
+      show_heartbeat_overlay: true,
+      show_heartbeat_extras: true,
+      show_heartbeat_daynight: true,
+      show_heartbeat_uptime: true,
       ...config,
     };
     this._render();
@@ -387,6 +688,14 @@ class ThinginoMotorControlCardEditor extends HTMLElement {
     const stepLeft = this._config.step_size_left ?? "";
     const stepRight = this._config.step_size_right ?? "";
     const showTitle = this._config.show_title !== false;
+    const showHeartbeat = this._config.show_heartbeat === true;
+    const showHeartbeatTimeNow = this._config.show_heartbeat_time_now !== false;
+    const showHeartbeatTimezone = this._config.show_heartbeat_timezone !== false;
+    const showHeartbeatMemory = this._config.show_heartbeat_memory !== false;
+    const showHeartbeatOverlay = this._config.show_heartbeat_overlay !== false;
+    const showHeartbeatExtras = this._config.show_heartbeat_extras !== false;
+    const showHeartbeatDaynight = this._config.show_heartbeat_daynight !== false;
+    const showHeartbeatUptime = this._config.show_heartbeat_uptime !== false;
 
     this.shadowRoot.innerHTML = `
       <style>
@@ -486,6 +795,38 @@ class ThinginoMotorControlCardEditor extends HTMLElement {
           <input type="checkbox" data-key="show_title" ${showTitle ? "checked" : ""} />
           Show title and subtitle
         </label>
+        <label>
+          <input type="checkbox" data-key="show_heartbeat" ${showHeartbeat ? "checked" : ""} />
+          Show heartbeat panel
+        </label>
+        <label>
+          <input type="checkbox" data-key="show_heartbeat_time_now" ${showHeartbeatTimeNow ? "checked" : ""} />
+          Show heartbeat time
+        </label>
+        <label>
+          <input type="checkbox" data-key="show_heartbeat_timezone" ${showHeartbeatTimezone ? "checked" : ""} />
+          Show timezone
+        </label>
+        <label>
+          <input type="checkbox" data-key="show_heartbeat_memory" ${showHeartbeatMemory ? "checked" : ""} />
+          Show memory fields
+        </label>
+        <label>
+          <input type="checkbox" data-key="show_heartbeat_overlay" ${showHeartbeatOverlay ? "checked" : ""} />
+          Show overlay fields
+        </label>
+        <label>
+          <input type="checkbox" data-key="show_heartbeat_extras" ${showHeartbeatExtras ? "checked" : ""} />
+          Show extras fields
+        </label>
+        <label>
+          <input type="checkbox" data-key="show_heartbeat_daynight" ${showHeartbeatDaynight ? "checked" : ""} />
+          Show day/night value
+        </label>
+        <label>
+          <input type="checkbox" data-key="show_heartbeat_uptime" ${showHeartbeatUptime ? "checked" : ""} />
+          Show uptime
+        </label>
         <div class="hint">Set host or entry_id. Host can be plain IP/host or URL.</div>
       </div>
     `;
@@ -499,6 +840,14 @@ class ThinginoMotorControlCardEditor extends HTMLElement {
             ? "Camera Motor Compact"
             : "Camera Motor"),
         show_title: this.shadowRoot.querySelector('input[data-key="show_title"]').checked,
+        show_heartbeat: this.shadowRoot.querySelector('input[data-key="show_heartbeat"]').checked,
+        show_heartbeat_time_now: this.shadowRoot.querySelector('input[data-key="show_heartbeat_time_now"]').checked,
+        show_heartbeat_timezone: this.shadowRoot.querySelector('input[data-key="show_heartbeat_timezone"]').checked,
+        show_heartbeat_memory: this.shadowRoot.querySelector('input[data-key="show_heartbeat_memory"]').checked,
+        show_heartbeat_overlay: this.shadowRoot.querySelector('input[data-key="show_heartbeat_overlay"]').checked,
+        show_heartbeat_extras: this.shadowRoot.querySelector('input[data-key="show_heartbeat_extras"]').checked,
+        show_heartbeat_daynight: this.shadowRoot.querySelector('input[data-key="show_heartbeat_daynight"]').checked,
+        show_heartbeat_uptime: this.shadowRoot.querySelector('input[data-key="show_heartbeat_uptime"]').checked,
       };
 
       const nextHost = this.shadowRoot
@@ -564,8 +913,9 @@ class ThinginoMotorControlCardEditor extends HTMLElement {
       });
     });
 
-    const showTitleInput = this.shadowRoot.querySelector('input[data-key="show_title"]');
-    showTitleInput.addEventListener("change", updateConfig);
+    this.shadowRoot.querySelectorAll('input[type="checkbox"]').forEach((input) => {
+      input.addEventListener("change", updateConfig);
+    });
 
     if (focusedKey) {
       const restoredInput = this.shadowRoot.querySelector(`input[data-key="${focusedKey}"]`);

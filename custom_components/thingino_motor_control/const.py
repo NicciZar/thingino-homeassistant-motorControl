@@ -24,6 +24,7 @@ SERVICE_MOVE_LEFT = "move_left"
 SERVICE_MOVE_RIGHT = "move_right"
 SERVICE_STOP = "stop"
 SERVICE_SET_IRCUT = "set_ircut"
+SERVICE_GET_HEARTBEAT = "get_heartbeat"
 
 COMMAND_UP = "up"
 COMMAND_DOWN = "down"
@@ -33,6 +34,7 @@ COMMAND_STOP = "stop"
 
 MOTOR_ENDPOINT_PATH = "/x/json-motor.cgi"
 IMP_ENDPOINT_PATH = "/x/json-imp.cgi"
+HEARTBEAT_ENDPOINT_PATH = "/x/json-heartbeat.cgi"
 
 COMMAND_VECTORS = {
     COMMAND_UP: (0, -1),

@@ -21,6 +21,7 @@ from .const import (
     CONF_USERNAME,
     DEFAULT_AUTH_HEADER_NAME,
     DEFAULT_STEP_SIZE,
+    HEARTBEAT_ENDPOINT_PATH,
     IMP_ENDPOINT_PATH,
     MOTOR_ENDPOINT_PATH,
 )
@@ -122,7 +123,13 @@ class CameraMotorClient:
             "val": resolved_value,
         }
 
-    async def _send_get(self, endpoint_path: str, params: dict) -> None:
+    async def _send_get(
+        self,
+        endpoint_path: str,
+        params: dict | None = None,
+        *,
+        expect_json: bool = False,
+    ) -> dict | None:
         """Call a camera API endpoint with query params."""
         session = async_get_clientsession(self._hass)
         url = f"{self._base_url.rstrip('/')}/{endpoint_path.lstrip('/')}"
@@ -144,6 +151,24 @@ class CameraMotorClient:
                 f"Camera API returned {response.status} for {response.url}: {body}"
             )
 
+        if not expect_json:
+            return None
+
+        try:
+            payload = await response.json(content_type=None)
+        except ValueError as err:
+            body = await response.text()
+            raise HomeAssistantError(
+                f"Camera API returned invalid JSON for {response.url}: {body}"
+            ) from err
+
+        if not isinstance(payload, dict):
+            raise HomeAssistantError(
+                f"Camera API returned unexpected heartbeat payload type: {type(payload).__name__}"
+            )
+
+        return payload
+
     async def send_command(self, command: str, step_size: float | None = None) -> None:
         """Call the local camera API for a motor command."""
         params = self._build_command_params(command, step_size)
@@ -153,3 +178,11 @@ class CameraMotorClient:
         """Call the local camera API to set ircut value (0 or 1)."""
         params = self._build_ircut_params(value)
         await self._send_get(IMP_ENDPOINT_PATH, params)
+
+    async def get_heartbeat(self) -> dict:
+        """Fetch heartbeat info from the camera."""
+        payload = await self._send_get(HEARTBEAT_ENDPOINT_PATH, expect_json=True)
+        if payload is None:
+            raise HomeAssistantError("Camera API returned no heartbeat payload")
+
+        return payload

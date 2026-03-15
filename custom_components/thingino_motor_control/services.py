@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+from typing import Any
 from urllib.parse import urlsplit
 
 import voluptuous as vol
 
-from homeassistant.core import HomeAssistant, ServiceCall
+from homeassistant.core import HomeAssistant, ServiceCall, SupportsResponse
 from homeassistant.exceptions import HomeAssistantError
 
 from .api import CameraMotorClient
@@ -20,6 +21,7 @@ from .const import (
     DATA_ENTRIES,
     DATA_SERVICES_REGISTERED,
     DOMAIN,
+    SERVICE_GET_HEARTBEAT,
     SERVICE_SET_IRCUT,
     SERVICE_TO_COMMAND,
 )
@@ -42,6 +44,13 @@ IRCUT_SERVICE_SCHEMA = vol.Schema(
         ),
         # Backward compatibility with older service calls.
         vol.Optional(CONF_VALUE): vol.All(vol.Coerce(int), vol.In([0, 1])),
+    }
+)
+
+HEARTBEAT_SERVICE_SCHEMA = vol.Schema(
+    {
+        vol.Optional(CONF_ENTRY_ID): str,
+        vol.Optional(CONF_HOST): str,
     }
 )
 
@@ -126,6 +135,13 @@ async def _handle_ircut(call: ServiceCall, hass: HomeAssistant) -> None:
     await client.send_ircut(value)
 
 
+async def _handle_get_heartbeat(call: ServiceCall, hass: HomeAssistant) -> dict[str, Any]:
+    entry_id = call.data.get(CONF_ENTRY_ID)
+    host = call.data.get(CONF_HOST)
+    client = _resolve_client(hass, entry_id, host)
+    return await client.get_heartbeat()
+
+
 async def async_setup_services(hass: HomeAssistant) -> None:
     """Register domain services once."""
     domain_data = hass.data.setdefault(DOMAIN, {})
@@ -158,6 +174,17 @@ async def async_setup_services(hass: HomeAssistant) -> None:
         schema=IRCUT_SERVICE_SCHEMA,
     )
 
+    async def _heartbeat_service_handler(call: ServiceCall) -> dict[str, Any]:
+        return await _handle_get_heartbeat(call, hass)
+
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_GET_HEARTBEAT,
+        _heartbeat_service_handler,
+        schema=HEARTBEAT_SERVICE_SCHEMA,
+        supports_response=SupportsResponse.OPTIONAL,
+    )
+
     domain_data[DATA_SERVICES_REGISTERED] = True
 
 
@@ -171,5 +198,6 @@ async def async_unload_services(hass: HomeAssistant) -> None:
         hass.services.async_remove(DOMAIN, service_name)
 
     hass.services.async_remove(DOMAIN, SERVICE_SET_IRCUT)
+    hass.services.async_remove(DOMAIN, SERVICE_GET_HEARTBEAT)
 
     domain_data[DATA_SERVICES_REGISTERED] = False

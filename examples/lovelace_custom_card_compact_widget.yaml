@@ -5,3 +5,4 @@ show_title: false
 step_size: 20
 step_size_up: 15
 step_size_down: 25
+show_heartbeat: false

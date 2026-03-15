@@ -13,6 +13,7 @@ Custom Home Assistant integration for controlling a camera motor over local API 
   - `thingino_motor_control.move_right`
   - `thingino_motor_control.stop`
   - `thingino_motor_control.set_ircut`
+  - `thingino_motor_control.get_heartbeat`
 - Sends local HTTP `GET` requests to your camera API
 
 ## Authentication support
@@ -88,6 +89,7 @@ The integration now calls your endpoint format:
 
 - `GET /x/json-motor.cgi?d=g&x=<value>&y=<value>`
 - `GET /x/json-imp.cgi?cmd=ircut&val=<0|1>`
+- `GET /x/json-heartbeat.cgi`
 
 The request is sent to the configured camera host and includes your configured auth header
 (default header name is `Authorization`).
@@ -121,7 +123,8 @@ If multiple cameras are configured and neither `entry_id` nor `host` is provided
 ## Lovelace control widget example
 
 This integration now includes a selectable custom card widget with a visual editor.
-The card includes movement controls plus a single Day/Night IR toggle button.
+The card includes movement controls plus an IR enable/disable switch.
+It can also show an optional heartbeat info panel with selectable fields.
 
 ### 1) Add the card resource once
 
@@ -153,6 +156,14 @@ step_size_up: 30
 step_size_down: 50
 step_size_left: 20
 step_size_right: 20
+show_heartbeat: true
+show_heartbeat_time_now: true
+show_heartbeat_timezone: true
+show_heartbeat_memory: true
+show_heartbeat_overlay: false
+show_heartbeat_extras: false
+show_heartbeat_daynight: true
+show_heartbeat_uptime: true
 ```
 
 Example YAML for the compact custom card:
@@ -171,6 +182,8 @@ step_size_down: 25
 `step_size` is optional and defaults to `40.5`.
 The widget `step_size` is used for all movement directions (up/down/left/right).
 `step_size_up/down/left/right` are optional per-direction overrides.
+`show_heartbeat` enables the heartbeat panel.
+`show_heartbeat_*` toggles let you show/hide heartbeat field groups.
 
 ## Manual card fallback
 
@@ -234,6 +247,16 @@ data:
 `set_ircut` sends `cmd=ircut` and accepts `ir_mode: day|night`.
 Mapping is `day -> val=1` and `night -> val=0`.
 For convenience, `irMode` is also accepted as an alias.
+
+Example heartbeat service call for a specific camera:
+
+```yaml
+service: thingino_motor_control.get_heartbeat
+data:
+  host: 192.168.178.118
+```
+
+`get_heartbeat` returns the camera heartbeat JSON payload (for example `uptime`, memory fields, and `daynight_value`).
 
 The same widget is also available at `examples/lovelace_motor_widget.yaml`.
 Custom-card example is at `examples/lovelace_custom_card_widget.yaml`.

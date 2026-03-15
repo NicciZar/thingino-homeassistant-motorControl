@@ -160,3 +160,20 @@ set_ircut:
               value: day
             - label: Night
               value: night
+
+get_heartbeat:
+  name: Get Heartbeat
+  description: Fetch heartbeat/status information from the camera.
+  fields:
+    entry_id:
+      name: Entry ID
+      description: Optional config entry id. Use this or host to target a specific camera.
+      required: false
+      selector:
+        text:
+    host:
+      name: Host
+      description: Optional camera host (for example 192.168.178.118 or http://192.168.178.118). Use this or entry_id.
+      required: false
+      selector:
+        text:
