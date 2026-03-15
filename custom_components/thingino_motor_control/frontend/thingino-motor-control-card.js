@@ -316,6 +316,52 @@ class ThinginoMotorControlCard extends HTMLElement {
     return value === null || value === "" ? "-" : String(value);
   }
 
+  _heartbeatTimeDisplay() {
+    if (!this._heartbeatData || this._heartbeatData.time_now === undefined) {
+      return "-";
+    }
+
+    const rawValue = this._heartbeatData.time_now;
+    if (rawValue === null || rawValue === "") {
+      return "-";
+    }
+
+    const epochSeconds = Number(rawValue);
+    if (!Number.isFinite(epochSeconds)) {
+      return String(rawValue);
+    }
+
+    const date = new Date(epochSeconds * 1000);
+    if (Number.isNaN(date.getTime())) {
+      return String(rawValue);
+    }
+
+    const timezone = this._heartbeatValue("timezone");
+    const baseFormat = {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: false,
+    };
+
+    if (timezone !== "-") {
+      try {
+        return new Intl.DateTimeFormat(undefined, {
+          ...baseFormat,
+          timeZone: timezone,
+        }).format(date);
+      }
+      catch (err) {
+        // Ignore invalid timezone values and fall back to local rendering.
+      }
+    }
+
+    return new Intl.DateTimeFormat(undefined, baseFormat).format(date);
+  }
+
   _render() {
     if (!this.shadowRoot || !this._config) {
       return;
@@ -348,7 +394,7 @@ class ThinginoMotorControlCard extends HTMLElement {
     const heartbeatRows = [];
     if (showHeartbeat) {
       if (this._config.show_heartbeat_time_now !== false) {
-        heartbeatRows.push(["Time", this._heartbeatValue("time_now")]);
+        heartbeatRows.push(["Time", this._heartbeatTimeDisplay()]);
       }
       if (this._config.show_heartbeat_timezone !== false) {
         heartbeatRows.push(["Timezone", this._heartbeatValue("timezone")]);
