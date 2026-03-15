@@ -1,0 +1,9 @@
+{
+  "services": {
+    "move_up": "mdi:arrow-up-bold",
+    "move_down": "mdi:arrow-down-bold",
+    "move_left": "mdi:arrow-left-bold",
+    "move_right": "mdi:arrow-right-bold",
+    "stop": "mdi:stop-circle-outline"
+  }
+}

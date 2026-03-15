@@ -1,0 +1,48 @@
+type: grid
+columns: 3
+square: true
+cards:
+  - type: button
+    icon: mdi:arrow-up-bold
+    name: Up
+    tap_action:
+      action: call-service
+      service: thingino_motor_control.move_up
+      data:
+        host: 192.168.178.118
+
+  - type: button
+    icon: mdi:stop-circle-outline
+    name: Stop
+    tap_action:
+      action: call-service
+      service: thingino_motor_control.stop
+      data:
+        host: 192.168.178.118
+
+  - type: button
+    icon: mdi:arrow-right-bold
+    name: Right
+    tap_action:
+      action: call-service
+      service: thingino_motor_control.move_right
+      data:
+        host: 192.168.178.118
+
+  - type: button
+    icon: mdi:arrow-left-bold
+    name: Left
+    tap_action:
+      action: call-service
+      service: thingino_motor_control.move_left
+      data:
+        host: 192.168.178.118
+
+  - type: button
+    icon: mdi:arrow-down-bold
+    name: Down
+    tap_action:
+      action: call-service
+      service: thingino_motor_control.move_down
+      data:
+        host: 192.168.178.118

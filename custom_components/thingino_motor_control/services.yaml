@@ -1,0 +1,84 @@
+move_up:
+  name: Move Up
+  description: Move the camera motor up.
+  fields:
+    entry_id:
+      name: Entry ID
+      description: Optional config entry id. Use this or host to target a specific camera.
+      required: false
+      selector:
+        text:
+    host:
+      name: Host
+      description: Optional camera host (for example 192.168.178.118). Use this or entry_id.
+      required: false
+      selector:
+        text:
+
+move_down:
+  name: Move Down
+  description: Move the camera motor down.
+  fields:
+    entry_id:
+      name: Entry ID
+      description: Optional config entry id. Use this or host to target a specific camera.
+      required: false
+      selector:
+        text:
+    host:
+      name: Host
+      description: Optional camera host (for example 192.168.178.118). Use this or entry_id.
+      required: false
+      selector:
+        text:
+
+move_left:
+  name: Move Left
+  description: Move the camera motor left.
+  fields:
+    entry_id:
+      name: Entry ID
+      description: Optional config entry id. Use this or host to target a specific camera.
+      required: false
+      selector:
+        text:
+    host:
+      name: Host
+      description: Optional camera host (for example 192.168.178.118). Use this or entry_id.
+      required: false
+      selector:
+        text:
+
+move_right:
+  name: Move Right
+  description: Move the camera motor right.
+  fields:
+    entry_id:
+      name: Entry ID
+      description: Optional config entry id. Use this or host to target a specific camera.
+      required: false
+      selector:
+        text:
+    host:
+      name: Host
+      description: Optional camera host (for example 192.168.178.118). Use this or entry_id.
+      required: false
+      selector:
+        text:
+
+stop:
+  name: Stop
+  description: Stop camera motor movement.
+  fields:
+    entry_id:
+      name: Entry ID
+      description: Optional config entry id. Use this or host to target a specific camera.
+      required: false
+      selector:
+        text:
+    host:
+      name: Host
+      description: Optional camera host (for example 192.168.178.118). Use this or entry_id.
+      required: false
+      selector:
+        text:

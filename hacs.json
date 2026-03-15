@@ -1,0 +1,8 @@
+{
+  "name": "Thingino Camera Motor Control",
+  "domains": [
+    "thingino_motor_control"
+  ],
+  "homeassistant": "2024.1.0",
+  "render_readme": true
+}

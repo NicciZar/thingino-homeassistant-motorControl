@@ -1,0 +1,25 @@
+{
+  "title": "Thingino Camera Motor Control",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect to camera",
+        "description": "Configure local camera API access.",
+        "data": {
+          "host": "Camera IP or hostname",
+          "use_https": "Use HTTPS",
+          "auth_header_name": "Authorization header name",
+          "auth_header_value": "Authorization header value (optional)",
+          "username": "Username (for Basic auth)",
+          "password": "Password (for Basic auth)"
+        }
+      }
+    },
+    "error": {
+      "already_configured": "This camera is already configured"
+    },
+    "abort": {
+      "already_configured": "This camera is already configured"
+    }
+  }
+}
