@@ -145,6 +145,22 @@ Write-Host "- Reuse existing tag: $ReuseTag"
 Write-Host "- Create GitHub release: $(-not $SkipGitHubRelease)"
 
 if (-not $Yes) {
+    $nonInteractive = $false
+    try {
+        $nonInteractive =
+            [Console]::IsInputRedirected -or
+            [Console]::IsOutputRedirected -or
+            [Console]::IsErrorRedirected
+    }
+    catch {
+        # Some hosts do not expose a full console; treat that as non-interactive.
+        $nonInteractive = $true
+    }
+
+    if ($nonInteractive) {
+        throw "Interactive confirmation is not available in this terminal host. Re-run with -Yes (and optionally -AllowDirty)."
+    }
+
     $confirmation = Read-Host "Continue? [y/N]"
     if ($confirmation -notin @("y", "Y", "yes", "YES")) {
         throw "Release aborted by user."
