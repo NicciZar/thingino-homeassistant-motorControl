@@ -13,6 +13,7 @@ from .api import CameraMotorClient
 from .const import (
     CONF_HOST,
     CONF_ENTRY_ID,
+    CONF_STEP_SIZE,
     DATA_ENTRIES,
     DATA_SERVICES_REGISTERED,
     DOMAIN,
@@ -23,6 +24,7 @@ BASE_SERVICE_SCHEMA = vol.Schema(
     {
         vol.Optional(CONF_ENTRY_ID): str,
         vol.Optional(CONF_HOST): str,
+        vol.Optional(CONF_STEP_SIZE): vol.All(vol.Coerce(float), vol.Range(min=0.1)),
     }
 )
 
@@ -86,8 +88,9 @@ def _resolve_client(
 async def _handle_command(call: ServiceCall, hass: HomeAssistant, command: str) -> None:
     entry_id = call.data.get(CONF_ENTRY_ID)
     host = call.data.get(CONF_HOST)
+    step_size = call.data.get(CONF_STEP_SIZE)
     client = _resolve_client(hass, entry_id, host)
-    await client.send_command(command)
+    await client.send_command(command, step_size=step_size)
 
 
 async def async_setup_services(hass: HomeAssistant) -> None:

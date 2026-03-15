@@ -9,6 +9,7 @@ CONF_AUTH_HEADER_VALUE = "auth_header_value"
 CONF_USERNAME = "username"
 CONF_PASSWORD = "password"
 CONF_ENTRY_ID = "entry_id"
+CONF_STEP_SIZE = "step_size"
 
 DEFAULT_AUTH_HEADER_NAME = "Authorization"
 DEFAULT_USE_HTTPS = False
@@ -28,13 +29,12 @@ COMMAND_STOP = "stop"
 
 MOTOR_ENDPOINT_PATH = "/x/json-motor.cgi"
 
-COMMAND_PARAMS = {
-    # Uses d=g as observed from the camera API.
-    COMMAND_UP: {"d": "g", "x": 0, "y": -DEFAULT_STEP_SIZE},
-    COMMAND_DOWN: {"d": "g", "x": 0, "y": DEFAULT_STEP_SIZE},
-    COMMAND_LEFT: {"d": "g", "x": -DEFAULT_STEP_SIZE, "y": 0},
-    COMMAND_RIGHT: {"d": "g", "x": DEFAULT_STEP_SIZE, "y": 0},
-    COMMAND_STOP: {"d": "g", "x": 0, "y": 0},
+COMMAND_VECTORS = {
+    COMMAND_UP: (0, -1),
+    COMMAND_DOWN: (0, 1),
+    COMMAND_LEFT: (-1, 0),
+    COMMAND_RIGHT: (1, 0),
+    COMMAND_STOP: (0, 0),
 }
 
 SERVICE_TO_COMMAND = {

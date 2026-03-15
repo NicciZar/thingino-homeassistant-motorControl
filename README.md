@@ -96,7 +96,10 @@ Current directional mapping in `custom_components/thingino_motor_control/const.p
 - Down: `x=0`, `y=40.5`
 - Stop: `x=0`, `y=0`
 
-If your camera's vertical axis is inverted, swap signs for `Up` and `Down` in `COMMAND_PARAMS`.
+You can override movement distance per service call with optional `step_size`.
+Default is `40.5`.
+
+If your camera's vertical axis is inverted, swap signs for `Up` and `Down` in `COMMAND_VECTORS`.
 
 ## Multiple camera targeting
 
@@ -140,6 +143,11 @@ type: custom:thingino-motor-control-card
 title: Front Camera
 host: 192.168.178.118
 show_title: true
+step_size: 40.5
+step_size_up: 30
+step_size_down: 50
+step_size_left: 20
+step_size_right: 20
 ```
 
 Example YAML for the compact custom card:
@@ -149,9 +157,15 @@ type: custom:thingino-motor-control-compact-card
 title: Front Camera Compact
 host: 192.168.178.118
 show_title: false
+step_size: 20
+step_size_up: 15
+step_size_down: 25
 ```
 
 `show_title` is optional and defaults to `true`.
+`step_size` is optional and defaults to `40.5`.
+The widget `step_size` is used for all movement directions (up/down/left/right).
+`step_size_up/down/left/right` are optional per-direction overrides.
 
 ## Manual card fallback
 
@@ -200,6 +214,7 @@ Example service data for a specific camera:
 service: thingino_motor_control.move_left
 data:
   host: 192.168.178.118
+  step_size: 20
 ```
 
 The same widget is also available at `examples/lovelace_motor_widget.yaml`.

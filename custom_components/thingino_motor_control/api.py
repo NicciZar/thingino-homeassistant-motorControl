@@ -11,7 +11,8 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .const import (
-    COMMAND_PARAMS,
+    COMMAND_STOP,
+    COMMAND_VECTORS,
     CONF_AUTH_HEADER_NAME,
     CONF_AUTH_HEADER_VALUE,
     CONF_HOST,
@@ -19,6 +20,7 @@ from .const import (
     CONF_USE_HTTPS,
     CONF_USERNAME,
     DEFAULT_AUTH_HEADER_NAME,
+    DEFAULT_STEP_SIZE,
     MOTOR_ENDPOINT_PATH,
 )
 
@@ -88,14 +90,30 @@ class CameraMotorClient:
 
         return headers
 
-    async def send_command(self, command: str) -> None:
-        """Call the local camera API for a motor command."""
-        if command not in COMMAND_PARAMS:
+    def _build_command_params(self, command: str, step_size: float | None) -> dict:
+        """Build query parameters for a motor command."""
+        if command not in COMMAND_VECTORS:
             raise HomeAssistantError(f"Unsupported motor command: {command}")
 
+        if command == COMMAND_STOP:
+            return {"d": "g", "x": 0, "y": 0}
+
+        resolved_step = DEFAULT_STEP_SIZE if step_size is None else float(step_size)
+        if resolved_step <= 0:
+            raise HomeAssistantError("step_size must be greater than 0")
+
+        vector_x, vector_y = COMMAND_VECTORS[command]
+        return {
+            "d": "g",
+            "x": vector_x * resolved_step,
+            "y": vector_y * resolved_step,
+        }
+
+    async def send_command(self, command: str, step_size: float | None = None) -> None:
+        """Call the local camera API for a motor command."""
         session = async_get_clientsession(self._hass)
         url = f"{self._base_url.rstrip('/')}/{MOTOR_ENDPOINT_PATH.lstrip('/')}"
-        params = COMMAND_PARAMS[command]
+        params = self._build_command_params(command, step_size)
         headers = self._build_headers()
 
         try:

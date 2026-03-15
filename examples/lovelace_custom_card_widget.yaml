@@ -1,3 +1,8 @@
 type: custom:thingino-motor-control-card
 title: Front Camera
 host: 192.168.178.118
+step_size: 40.5
+step_size_up: 30
+step_size_down: 50
+step_size_left: 20
+step_size_right: 20

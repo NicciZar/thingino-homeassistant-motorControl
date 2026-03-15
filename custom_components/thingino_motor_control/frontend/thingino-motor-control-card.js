@@ -1,5 +1,17 @@
 const CARD_TYPE_STANDARD = "custom:thingino-motor-control-card";
 const CARD_TYPE_COMPACT = "custom:thingino-motor-control-compact-card";
+const DEFAULT_STEP_SIZE = 40.5;
+
+function toPositiveNumberOrNull(value) {
+  if (value === null || value === undefined || value === "") {
+    return null;
+  }
+  const number = Number(value);
+  if (!Number.isFinite(number) || number <= 0) {
+    return null;
+  }
+  return number;
+}
 
 function isCompactCardType(type) {
   return type === CARD_TYPE_COMPACT;
@@ -16,6 +28,7 @@ class ThinginoMotorControlCard extends HTMLElement {
       title: "Camera Motor",
       host: "192.168.178.118",
       show_title: true,
+      step_size: DEFAULT_STEP_SIZE,
     };
   }
 
@@ -40,6 +53,7 @@ class ThinginoMotorControlCard extends HTMLElement {
       type: cardType,
       title: defaultTitle,
       show_title: true,
+      step_size: DEFAULT_STEP_SIZE,
       ...config,
       compact: compactMode,
     };
@@ -59,7 +73,26 @@ class ThinginoMotorControlCard extends HTMLElement {
     return 4;
   }
 
-  _serviceData() {
+  _resolveStepSize(serviceName) {
+    const globalStep = toPositiveNumberOrNull(this._config.step_size) ?? DEFAULT_STEP_SIZE;
+
+    if (serviceName === "move_up") {
+      return toPositiveNumberOrNull(this._config.step_size_up) ?? globalStep;
+    }
+    if (serviceName === "move_down") {
+      return toPositiveNumberOrNull(this._config.step_size_down) ?? globalStep;
+    }
+    if (serviceName === "move_left") {
+      return toPositiveNumberOrNull(this._config.step_size_left) ?? globalStep;
+    }
+    if (serviceName === "move_right") {
+      return toPositiveNumberOrNull(this._config.step_size_right) ?? globalStep;
+    }
+
+    return globalStep;
+  }
+
+  _serviceData(serviceName) {
     const data = {};
     if (this._config.host) {
       data.host = this._config.host;
@@ -67,6 +100,11 @@ class ThinginoMotorControlCard extends HTMLElement {
     if (this._config.entry_id) {
       data.entry_id = this._config.entry_id;
     }
+
+    if (serviceName !== "stop") {
+      data.step_size = this._resolveStepSize(serviceName);
+    }
+
     return data;
   }
 
@@ -75,7 +113,8 @@ class ThinginoMotorControlCard extends HTMLElement {
       return;
     }
 
-    this._hass.callService("thingino_motor_control", serviceName, this._serviceData());
+    const data = this._serviceData(serviceName);
+    this._hass.callService("thingino_motor_control", serviceName, data);
   }
 
   _render() {
@@ -202,6 +241,7 @@ class ThinginoMotorControlCompactCard extends ThinginoMotorControlCard {
       title: "Camera Motor Compact",
       host: "192.168.178.118",
       show_title: false,
+      step_size: DEFAULT_STEP_SIZE,
     };
   }
 
@@ -232,6 +272,7 @@ class ThinginoMotorControlCardEditor extends HTMLElement {
       type: this._cardType,
       title: defaultTitle,
       show_title: true,
+      step_size: DEFAULT_STEP_SIZE,
       ...config,
     };
     this._render();
@@ -255,6 +296,11 @@ class ThinginoMotorControlCardEditor extends HTMLElement {
     const title = this._config.title || "";
     const host = this._config.host || "";
     const entryId = this._config.entry_id || "";
+    const stepSize = this._config.step_size ?? DEFAULT_STEP_SIZE;
+    const stepUp = this._config.step_size_up ?? "";
+    const stepDown = this._config.step_size_down ?? "";
+    const stepLeft = this._config.step_size_left ?? "";
+    const stepRight = this._config.step_size_right ?? "";
     const showTitle = this._config.show_title !== false;
 
     this.shadowRoot.innerHTML = `
@@ -298,6 +344,60 @@ class ThinginoMotorControlCardEditor extends HTMLElement {
           <input type="text" data-key="entry_id" value="${entryId}" placeholder="abc123..." />
         </label>
         <label>
+          Step Size
+          <input
+            type="number"
+            data-key="step_size"
+            value="${stepSize}"
+            min="0.1"
+            step="0.1"
+          />
+        </label>
+        <label>
+          Step Size Up (optional override)
+          <input
+            type="number"
+            data-key="step_size_up"
+            value="${stepUp}"
+            min="0.1"
+            step="0.1"
+            placeholder="Use global"
+          />
+        </label>
+        <label>
+          Step Size Down (optional override)
+          <input
+            type="number"
+            data-key="step_size_down"
+            value="${stepDown}"
+            min="0.1"
+            step="0.1"
+            placeholder="Use global"
+          />
+        </label>
+        <label>
+          Step Size Left (optional override)
+          <input
+            type="number"
+            data-key="step_size_left"
+            value="${stepLeft}"
+            min="0.1"
+            step="0.1"
+            placeholder="Use global"
+          />
+        </label>
+        <label>
+          Step Size Right (optional override)
+          <input
+            type="number"
+            data-key="step_size_right"
+            value="${stepRight}"
+            min="0.1"
+            step="0.1"
+            placeholder="Use global"
+          />
+        </label>
+        <label>
           <input type="checkbox" data-key="show_title" ${showTitle ? "checked" : ""} />
           Show title and subtitle
         </label>
@@ -322,6 +422,20 @@ class ThinginoMotorControlCardEditor extends HTMLElement {
       const nextEntryId = this.shadowRoot
         .querySelector('input[data-key="entry_id"]')
         .value.trim();
+      const stepSizeInput = this.shadowRoot.querySelector('input[data-key="step_size"]');
+      const nextStepSize = toPositiveNumberOrNull(stepSizeInput.value);
+      const nextStepUp = toPositiveNumberOrNull(
+        this.shadowRoot.querySelector('input[data-key="step_size_up"]').value
+      );
+      const nextStepDown = toPositiveNumberOrNull(
+        this.shadowRoot.querySelector('input[data-key="step_size_down"]').value
+      );
+      const nextStepLeft = toPositiveNumberOrNull(
+        this.shadowRoot.querySelector('input[data-key="step_size_left"]').value
+      );
+      const nextStepRight = toPositiveNumberOrNull(
+        this.shadowRoot.querySelector('input[data-key="step_size_right"]').value
+      );
 
       if (nextHost) {
         next.host = nextHost;
@@ -331,11 +445,31 @@ class ThinginoMotorControlCardEditor extends HTMLElement {
         next.entry_id = nextEntryId;
       }
 
+      if (nextStepSize !== null) {
+        next.step_size = nextStepSize;
+      }
+      else {
+        next.step_size = DEFAULT_STEP_SIZE;
+      }
+
+      if (nextStepUp !== null) {
+        next.step_size_up = nextStepUp;
+      }
+      if (nextStepDown !== null) {
+        next.step_size_down = nextStepDown;
+      }
+      if (nextStepLeft !== null) {
+        next.step_size_left = nextStepLeft;
+      }
+      if (nextStepRight !== null) {
+        next.step_size_right = nextStepRight;
+      }
+
       this._config = next;
       this._emitConfig(next);
     };
 
-    this.shadowRoot.querySelectorAll('input[type="text"]').forEach((input) => {
+    this.shadowRoot.querySelectorAll('input[type="text"], input[type="number"]').forEach((input) => {
       input.addEventListener("input", updateConfig);
     });
 
