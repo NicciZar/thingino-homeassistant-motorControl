@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import base64
+from urllib.parse import urlsplit
 
 from aiohttp import ClientError, ClientTimeout
 
@@ -36,8 +37,28 @@ class CameraMotorClient:
 
     @property
     def _base_url(self) -> str:
-        scheme = "https" if self._use_https else "http"
-        return f"{scheme}://{self._host}"
+        """Return normalized base URL for the configured camera host.
+
+        Accepts plain host/IP values and full URL values.
+        """
+        raw_host = self._host.strip()
+        if not raw_host:
+            raise HomeAssistantError("Camera host is empty")
+
+        default_scheme = "https" if self._use_https else "http"
+        candidate = raw_host if "://" in raw_host else f"{default_scheme}://{raw_host}"
+
+        parsed = urlsplit(candidate)
+        if not parsed.hostname:
+            raise HomeAssistantError(f"Invalid camera host value: {self._host}")
+
+        scheme = parsed.scheme or default_scheme
+        if parsed.port is not None:
+            netloc = f"{parsed.hostname}:{parsed.port}"
+        else:
+            netloc = parsed.hostname
+
+        return f"{scheme}://{netloc}"
 
     @property
     def host(self) -> str:
@@ -73,7 +94,7 @@ class CameraMotorClient:
             raise HomeAssistantError(f"Unsupported motor command: {command}")
 
         session = async_get_clientsession(self._hass)
-        url = f"{self._base_url}{MOTOR_ENDPOINT_PATH}"
+        url = f"{self._base_url.rstrip('/')}/{MOTOR_ENDPOINT_PATH.lstrip('/')}"
         params = COMMAND_PARAMS[command]
         headers = self._build_headers()
 
