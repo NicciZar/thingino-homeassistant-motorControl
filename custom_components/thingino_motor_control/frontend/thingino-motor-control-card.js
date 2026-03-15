@@ -3,6 +3,23 @@ const CARD_TYPE_COMPACT = "custom:thingino-motor-control-compact-card";
 const DEFAULT_STEP_SIZE = 40.5;
 const IR_MODE_DAY = "day";
 const IR_MODE_NIGHT = "night";
+const HEARTBEAT_KEYS = [
+  "time_now",
+  "timezone",
+  "mem_total",
+  "mem_active",
+  "mem_buffers",
+  "mem_cached",
+  "mem_free",
+  "overlay_total",
+  "overlay_used",
+  "overlay_free",
+  "extras_total",
+  "extras_used",
+  "extras_free",
+  "daynight_value",
+  "uptime",
+];
 
 function normalizeIrMode(value) {
   return value === IR_MODE_NIGHT ? IR_MODE_NIGHT : IR_MODE_DAY;
@@ -14,6 +31,56 @@ function isIrEnabledFromMode(mode) {
 
 function modeFromIrEnabled(enabled) {
   return enabled ? IR_MODE_NIGHT : IR_MODE_DAY;
+}
+
+function hasHeartbeatKeys(payload) {
+  return Boolean(
+    payload &&
+      typeof payload === "object" &&
+      HEARTBEAT_KEYS.some((key) => Object.prototype.hasOwnProperty.call(payload, key))
+  );
+}
+
+function unwrapHeartbeatPayload(payload) {
+  if (!payload || typeof payload !== "object") {
+    return null;
+  }
+
+  if (hasHeartbeatKeys(payload)) {
+    return payload;
+  }
+
+  if (Array.isArray(payload)) {
+    for (const item of payload) {
+      const candidate = unwrapHeartbeatPayload(item);
+      if (candidate) {
+        return candidate;
+      }
+    }
+    return null;
+  }
+
+  const nestedCandidates = [
+    payload.response,
+    payload.service_response,
+    payload.result,
+    payload.message,
+  ];
+  for (const candidate of nestedCandidates) {
+    const unwrapped = unwrapHeartbeatPayload(candidate);
+    if (unwrapped) {
+      return unwrapped;
+    }
+  }
+
+  const objectValues = Object.values(payload).filter(
+    (value) => value && typeof value === "object"
+  );
+  if (objectValues.length === 1) {
+    return unwrapHeartbeatPayload(objectValues[0]);
+  }
+
+  return null;
 }
 
 function toPositiveNumberOrNull(value) {
@@ -188,29 +255,7 @@ class ThinginoMotorControlCard extends HTMLElement {
   }
 
   _extractServiceResponse(result) {
-    if (!result || typeof result !== "object") {
-      return null;
-    }
-
-    if (result.service_response && typeof result.service_response === "object") {
-      return result.service_response;
-    }
-
-    if (result.response && typeof result.response === "object") {
-      return result.response;
-    }
-
-    if (
-      Array.isArray(result) &&
-      result[0] &&
-      typeof result[0] === "object" &&
-      result[0].service_response &&
-      typeof result[0].service_response === "object"
-    ) {
-      return result[0].service_response;
-    }
-
-    return result;
+    return unwrapHeartbeatPayload(result);
   }
 
   async _fetchHeartbeat() {
@@ -232,7 +277,7 @@ class ThinginoMotorControlCard extends HTMLElement {
       );
       const payload = this._extractServiceResponse(result);
       if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
-        throw new Error("Camera heartbeat response was empty or invalid.");
+        throw new Error("Camera heartbeat response was empty, wrapped, or invalid.");
       }
 
       this._heartbeatData = payload;
@@ -425,9 +470,9 @@ class ThinginoMotorControlCard extends HTMLElement {
 
         .ir-switch {
           width: 100%;
-          display: grid;
-          grid-template-columns: 1fr auto;
+          display: flex;
           align-items: center;
+          justify-content: flex-start;
           border-radius: ${borderRadius}px;
           background: var(--secondary-background-color);
           padding: ${this._compactMode ? "6px 8px" : "8px 10px"};
@@ -436,19 +481,22 @@ class ThinginoMotorControlCard extends HTMLElement {
         }
 
         .ir-switch-label {
-          display: inline-flex;
+          width: 100%;
+          display: flex;
           align-items: center;
-          gap: 6px;
+          gap: 8px;
           font-weight: 600;
+          cursor: pointer;
         }
 
         .ir-switch-state {
           color: var(--secondary-text-color);
           font-size: ${this._compactMode ? "0.72rem" : "0.78rem"};
-          margin-left: 4px;
+          margin-left: auto;
         }
 
         .ir-switch input[type="checkbox"] {
+          margin: 0;
           width: ${this._compactMode ? "16px" : "18px"};
           height: ${this._compactMode ? "16px" : "18px"};
           accent-color: var(--paper-item-icon-active-color, var(--accent-color));
@@ -556,17 +604,16 @@ class ThinginoMotorControlCard extends HTMLElement {
         </div>
         <div class="ir-controls">
           <div class="ir-switch" title="Enable or disable IR night mode">
-            <label class="ir-switch-label" for="ir-enabled-input">
+            <label class="ir-switch-label">
+              <input
+                type="checkbox"
+                data-ir-enabled="true"
+                ${this._irEnabled ? "checked" : ""}
+              />
               <ha-icon icon="${irIcon}"></ha-icon>
               IR
               <span class="ir-switch-state">${irState}</span>
             </label>
-            <input
-              id="ir-enabled-input"
-              type="checkbox"
-              data-ir-enabled="true"
-              ${this._irEnabled ? "checked" : ""}
-            />
           </div>
         </div>
         ${heartbeatSectionHtml}
