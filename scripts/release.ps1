@@ -285,23 +285,6 @@ try {
     Write-Host "- Current: $currentVersion"
     Write-Host "- Next:    $newVersion"
 
-    $versionChanged = $newVersion -ne $currentVersion
-    if ($versionChanged) {
-        Write-Host "Updating manifest version..." -ForegroundColor Cyan
-        $manifestJson.version = $newVersion
-        $manifestJson | ConvertTo-Json -Depth 10 | Set-Content -Path $manifestPath -Encoding UTF8
-
-        Write-Host "Committing version bump..." -ForegroundColor Cyan
-        git add -- $manifestPath
-        git commit -m "chore(release): bump version to v$newVersion" | Out-Null
-        if ($LASTEXITCODE -ne 0) {
-            throw "Failed to commit manifest version bump to $newVersion."
-        }
-    }
-    else {
-        Write-Host "Version unchanged ($currentVersion)." -ForegroundColor Yellow
-    }
-
     $tag = "v$newVersion"
 
     $localTagExistsRaw = git tag --list $tag 2>$null
@@ -349,6 +332,23 @@ try {
         Write-Host ""
         Write-Host "Dry run complete. No files were changed, committed, pushed, or released." -ForegroundColor Green
         return
+    }
+
+    $versionChanged = $newVersion -ne $currentVersion
+    if ($versionChanged) {
+        Write-Host "Updating manifest version..." -ForegroundColor Cyan
+        $manifestJson.version = $newVersion
+        $manifestJson | ConvertTo-Json -Depth 10 | Set-Content -Path $manifestPath -Encoding UTF8
+
+        Write-Host "Committing version bump..." -ForegroundColor Cyan
+        git add -- $manifestPath
+        git commit -m "chore(release): bump version to v$newVersion" | Out-Null
+        if ($LASTEXITCODE -ne 0) {
+            throw "Failed to commit manifest version bump to $newVersion."
+        }
+    }
+    else {
+        Write-Host "Version unchanged ($currentVersion)." -ForegroundColor Yellow
     }
 
     Write-Host "Pushing branch '$currentBranch'..."
