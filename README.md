@@ -76,6 +76,7 @@ Useful flags:
 - `-SkipGitHubRelease` push tag only
 - `-Draft` create draft GitHub release
 - `-Prerelease` mark GitHub release as pre-release
+- `-ReuseTag` continue if local/remote tag already exists
 - `-Version 0.3.1` explicitly set release version (must match manifest)
 
 ## Camera API used

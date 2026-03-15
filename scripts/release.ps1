@@ -3,6 +3,7 @@ param(
     [switch]$SkipGitHubRelease,
     [switch]$Draft,
     [switch]$Prerelease,
+    [switch]$ReuseTag,
     [switch]$AllowDirty,
     [switch]$Yes
 )
@@ -107,8 +108,12 @@ if (-not $AllowDirty) {
 
 $localTagExistsRaw = git tag --list $tag 2>$null
 $localTagExists = Convert-ToTrimmedText -Value $localTagExistsRaw
-if ($localTagExists) {
-    throw "Local tag '$tag' already exists."
+$hasLocalTag = -not [string]::IsNullOrWhiteSpace($localTagExists)
+if ($hasLocalTag -and -not $ReuseTag) {
+    throw "Local tag '$tag' already exists. Use -ReuseTag to continue with the existing tag."
+}
+if ($hasLocalTag -and $ReuseTag) {
+    Write-Warning "Local tag '$tag' already exists. Reusing existing local tag."
 }
 
 Write-Host "Fetching remote tags..."
@@ -116,8 +121,12 @@ git fetch --tags origin | Out-Null
 
 $remoteTagExistsRaw = git ls-remote --tags origin "refs/tags/$tag" 2>$null
 $remoteTagExists = Convert-ToTrimmedText -Value $remoteTagExistsRaw
-if ($remoteTagExists) {
-    throw "Remote tag '$tag' already exists on origin."
+$hasRemoteTag = -not [string]::IsNullOrWhiteSpace($remoteTagExists)
+if ($hasRemoteTag -and -not $ReuseTag) {
+    throw "Remote tag '$tag' already exists on origin. Use -ReuseTag to continue with the existing tag."
+}
+if ($hasRemoteTag -and $ReuseTag) {
+    Write-Warning "Remote tag '$tag' already exists on origin."
 }
 
 $remoteUrlRaw = git remote get-url origin 2>$null
@@ -132,6 +141,7 @@ Write-Host "- Repository: $repoUrl"
 Write-Host "- Branch: $currentBranch"
 Write-Host "- Version: $Version"
 Write-Host "- Tag: $tag"
+Write-Host "- Reuse existing tag: $ReuseTag"
 Write-Host "- Create GitHub release: $(-not $SkipGitHubRelease)"
 
 if (-not $Yes) {
@@ -144,14 +154,32 @@ if (-not $Yes) {
 Write-Host "Pushing branch '$currentBranch'..."
 git push origin $currentBranch
 
-Write-Host "Creating annotated tag '$tag'..."
-git tag -a $tag -m "Release $tag"
+if (-not $hasLocalTag) {
+    Write-Host "Creating annotated tag '$tag'..."
+    git tag -a $tag -m "Release $tag"
+}
+else {
+    Write-Host "Skipping tag creation, '$tag' already exists locally."
+}
 
-Write-Host "Pushing tag '$tag'..."
-git push origin $tag
+if (-not $hasRemoteTag) {
+    Write-Host "Pushing tag '$tag'..."
+    git push origin $tag
+}
+else {
+    Write-Host "Skipping tag push, '$tag' already exists on origin."
+}
 
 if (-not $SkipGitHubRelease) {
     if (Get-Command gh -ErrorAction SilentlyContinue) {
+        gh release view $tag --json tagName *> $null
+        $releaseExists = ($LASTEXITCODE -eq 0)
+        if ($releaseExists) {
+            Write-Host "GitHub release '$tag' already exists. Skipping release creation."
+            Write-Host "Release flow completed successfully for $tag"
+            return
+        }
+
         $ghArgs = @(
             "release",
             "create",
