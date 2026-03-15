@@ -481,8 +481,14 @@ class ThinginoMotorControlCardEditor extends HTMLElement {
       this._emitConfig(next);
     };
 
+    // Avoid focus loss in the HA editor by updating config only on committed field changes.
     this.shadowRoot.querySelectorAll('input[type="text"], input[type="number"]').forEach((input) => {
-      input.addEventListener("input", updateConfig);
+      input.addEventListener("change", updateConfig);
+      input.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") {
+          updateConfig();
+        }
+      });
     });
 
     const showTitleInput = this.shadowRoot.querySelector('input[data-key="show_title"]');
