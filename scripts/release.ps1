@@ -22,7 +22,7 @@ function Get-HttpsRepoUrl {
     param([string]$RemoteUrl)
 
     if ($RemoteUrl -match "^https://") {
-        return ($RemoteUrl -replace "\\.git$", "")
+        return ($RemoteUrl -replace "\.git$", "")
     }
 
     if ($RemoteUrl -match "^git@github.com:(.+?)\.git$") {
@@ -36,9 +36,27 @@ function Get-HttpsRepoUrl {
     return $RemoteUrl
 }
 
+function Convert-ToTrimmedText {
+    param([AllowNull()]$Value)
+
+    if ($null -eq $Value) {
+        return ""
+    }
+
+    if ($Value -is [array]) {
+        if ($Value.Count -eq 0) {
+            return ""
+        }
+        return (($Value -join "`n").Trim())
+    }
+
+    return ([string]$Value).Trim()
+}
+
 Assert-CommandExists -CommandName "git"
 
-$repoRoot = (git rev-parse --show-toplevel).Trim()
+$repoRootRaw = git rev-parse --show-toplevel 2>$null
+$repoRoot = Convert-ToTrimmedText -Value $repoRootRaw
 if (-not $repoRoot) {
     throw "Could not determine git repository root."
 }
@@ -70,7 +88,8 @@ if ($Version -ne $manifestVersion) {
 }
 
 $tag = "v$Version"
-$currentBranch = (git branch --show-current).Trim()
+$currentBranchRaw = git branch --show-current 2>$null
+$currentBranch = Convert-ToTrimmedText -Value $currentBranchRaw
 if (-not $currentBranch) {
     throw "Could not determine current branch."
 }
@@ -86,7 +105,8 @@ if (-not $AllowDirty) {
     }
 }
 
-$localTagExists = (git tag --list $tag).Trim()
+$localTagExistsRaw = git tag --list $tag 2>$null
+$localTagExists = Convert-ToTrimmedText -Value $localTagExistsRaw
 if ($localTagExists) {
     throw "Local tag '$tag' already exists."
 }
@@ -94,12 +114,17 @@ if ($localTagExists) {
 Write-Host "Fetching remote tags..."
 git fetch --tags origin | Out-Null
 
-$remoteTagExists = (git ls-remote --tags origin "refs/tags/$tag").Trim()
+$remoteTagExistsRaw = git ls-remote --tags origin "refs/tags/$tag" 2>$null
+$remoteTagExists = Convert-ToTrimmedText -Value $remoteTagExistsRaw
 if ($remoteTagExists) {
     throw "Remote tag '$tag' already exists on origin."
 }
 
-$remoteUrl = (git remote get-url origin).Trim()
+$remoteUrlRaw = git remote get-url origin 2>$null
+$remoteUrl = Convert-ToTrimmedText -Value $remoteUrlRaw
+if (-not $remoteUrl) {
+    throw "Could not determine origin remote URL."
+}
 $repoUrl = Get-HttpsRepoUrl -RemoteUrl $remoteUrl
 
 Write-Host "Ready to create release:"
