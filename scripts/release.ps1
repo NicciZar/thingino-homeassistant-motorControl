@@ -169,6 +169,16 @@ function Resolve-AutoBumpType {
     return "patch"
 }
 
+function Write-Utf8NoBomFile {
+    param(
+        [string]$Path,
+        [string]$Content
+    )
+
+    $encoding = New-Object System.Text.UTF8Encoding($false)
+    [System.IO.File]::WriteAllText($Path, $Content, $encoding)
+}
+
 try {
     Assert-CommandExists -CommandName "git"
 
@@ -338,7 +348,8 @@ try {
     if ($versionChanged) {
         Write-Host "Updating manifest version..." -ForegroundColor Cyan
         $manifestJson.version = $newVersion
-        $manifestJson | ConvertTo-Json -Depth 10 | Set-Content -Path $manifestPath -Encoding UTF8
+        $manifestContent = $manifestJson | ConvertTo-Json -Depth 10
+        Write-Utf8NoBomFile -Path $manifestPath -Content $manifestContent
 
         Write-Host "Committing version bump..." -ForegroundColor Cyan
         git add -- $manifestPath
