@@ -293,6 +293,18 @@ class ThinginoMotorControlCardEditor extends HTMLElement {
       return;
     }
 
+    const previousFocused = this.shadowRoot.activeElement;
+    const focusedKey = previousFocused?.dataset?.key || null;
+    const focusedType = previousFocused?.type || null;
+    const focusedSelectionStart =
+      typeof previousFocused?.selectionStart === "number"
+        ? previousFocused.selectionStart
+        : null;
+    const focusedSelectionEnd =
+      typeof previousFocused?.selectionEnd === "number"
+        ? previousFocused.selectionEnd
+        : null;
+
     const title = this._config.title || "";
     const host = this._config.host || "";
     const entryId = this._config.entry_id || "";
@@ -475,6 +487,24 @@ class ThinginoMotorControlCardEditor extends HTMLElement {
 
     const showTitleInput = this.shadowRoot.querySelector('input[data-key="show_title"]');
     showTitleInput.addEventListener("change", updateConfig);
+
+    if (focusedKey) {
+      const restoredInput = this.shadowRoot.querySelector(`input[data-key="${focusedKey}"]`);
+      if (restoredInput) {
+        restoredInput.focus();
+        if (
+          focusedType === "text" &&
+          typeof focusedSelectionStart === "number" &&
+          typeof focusedSelectionEnd === "number" &&
+          typeof restoredInput.setSelectionRange === "function"
+        ) {
+          const maxIndex = restoredInput.value.length;
+          const safeStart = Math.min(focusedSelectionStart, maxIndex);
+          const safeEnd = Math.min(focusedSelectionEnd, maxIndex);
+          restoredInput.setSelectionRange(safeStart, safeEnd);
+        }
+      }
+    }
   }
 }
 
