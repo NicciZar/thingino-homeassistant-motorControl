@@ -18,9 +18,10 @@ Custom Home Assistant integration for controlling a camera motor over local API 
 
 ## Compatibility and Credits
 
-- This addon is only confirmed to work with Thingino firmware for WUUK Y0510 installed from this exact installer path:
+- This addon is only confirmed to work with Thingino firmware for WUUK Y0510:
   https://github.com/wltechblog/thingino-installers/tree/main/wuuk-y0510
 - Other camera models/installer paths or non-Thingino firmware may work, but are currently unverified.
+
 - Firmware credit: Thingino open-source firmware project and contributors:
   https://github.com/themactep/thingino-firmware
 
