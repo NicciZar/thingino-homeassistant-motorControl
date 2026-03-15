@@ -12,6 +12,7 @@ Custom Home Assistant integration for controlling a camera motor over local API 
   - `thingino_motor_control.move_left`
   - `thingino_motor_control.move_right`
   - `thingino_motor_control.stop`
+  - `thingino_motor_control.set_ircut`
 - Sends local HTTP `GET` requests to your camera API
 
 ## Authentication support
@@ -86,6 +87,7 @@ Useful flags:
 The integration now calls your endpoint format:
 
 - `GET /x/json-motor.cgi?d=g&x=<value>&y=<value>`
+- `GET /x/json-imp.cgi?cmd=ircut&val=<0|1>`
 
 The request is sent to the configured camera host and includes your configured auth header
 (default header name is `Authorization`).
@@ -119,6 +121,7 @@ If multiple cameras are configured and neither `entry_id` nor `host` is provided
 ## Lovelace control widget example
 
 This integration now includes a selectable custom card widget with a visual editor.
+The card includes movement controls plus a single Day/Night IR toggle button.
 
 ### 1) Add the card resource once
 
@@ -218,6 +221,19 @@ data:
   host: 192.168.178.118
   step_size: 20
 ```
+
+Example IR-cut service call for a specific camera:
+
+```yaml
+service: thingino_motor_control.set_ircut
+data:
+  host: 192.168.178.118
+  ir_mode: night
+```
+
+`set_ircut` sends `cmd=ircut` and accepts `ir_mode: day|night`.
+Mapping is `day -> val=1` and `night -> val=0`.
+For convenience, `irMode` is also accepted as an alias.
 
 The same widget is also available at `examples/lovelace_motor_widget.yaml`.
 Custom-card example is at `examples/lovelace_custom_card_widget.yaml`.

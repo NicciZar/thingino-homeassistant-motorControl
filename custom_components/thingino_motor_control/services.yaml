@@ -132,3 +132,31 @@ stop:
           max: 500
           step: 0.1
           mode: box
+
+set_ircut:
+  name: Set IR Cut
+  description: Set camera day/night IR mode using the json-imp endpoint.
+  fields:
+    entry_id:
+      name: Entry ID
+      description: Optional config entry id. Use this or host to target a specific camera.
+      required: false
+      selector:
+        text:
+    host:
+      name: Host
+      description: Optional camera host (for example 192.168.178.118 or http://192.168.178.118). Use this or entry_id.
+      required: false
+      selector:
+        text:
+    ir_mode:
+      name: IR Mode
+      description: Required IR mode. Use day (ircut=1) or night (ircut=0).
+      required: true
+      selector:
+        select:
+          options:
+            - label: Day
+              value: day
+            - label: Night
+              value: night

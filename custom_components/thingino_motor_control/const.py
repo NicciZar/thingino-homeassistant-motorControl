@@ -10,6 +10,9 @@ CONF_USERNAME = "username"
 CONF_PASSWORD = "password"
 CONF_ENTRY_ID = "entry_id"
 CONF_STEP_SIZE = "step_size"
+CONF_IR_MODE = "ir_mode"
+CONF_IR_MODE_CAMEL = "irMode"
+CONF_VALUE = "value"
 
 DEFAULT_AUTH_HEADER_NAME = "Authorization"
 DEFAULT_USE_HTTPS = False
@@ -20,6 +23,7 @@ SERVICE_MOVE_DOWN = "move_down"
 SERVICE_MOVE_LEFT = "move_left"
 SERVICE_MOVE_RIGHT = "move_right"
 SERVICE_STOP = "stop"
+SERVICE_SET_IRCUT = "set_ircut"
 
 COMMAND_UP = "up"
 COMMAND_DOWN = "down"
@@ -28,6 +32,7 @@ COMMAND_RIGHT = "right"
 COMMAND_STOP = "stop"
 
 MOTOR_ENDPOINT_PATH = "/x/json-motor.cgi"
+IMP_ENDPOINT_PATH = "/x/json-imp.cgi"
 
 COMMAND_VECTORS = {
     COMMAND_UP: (0, -1),

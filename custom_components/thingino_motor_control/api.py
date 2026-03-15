@@ -21,6 +21,7 @@ from .const import (
     CONF_USERNAME,
     DEFAULT_AUTH_HEADER_NAME,
     DEFAULT_STEP_SIZE,
+    IMP_ENDPOINT_PATH,
     MOTOR_ENDPOINT_PATH,
 )
 
@@ -109,11 +110,22 @@ class CameraMotorClient:
             "y": vector_y * resolved_step,
         }
 
-    async def send_command(self, command: str, step_size: float | None = None) -> None:
-        """Call the local camera API for a motor command."""
+    @staticmethod
+    def _build_ircut_params(value: int) -> dict[str, int | str]:
+        """Build query parameters for an ircut command."""
+        resolved_value = int(value)
+        if resolved_value not in (0, 1):
+            raise HomeAssistantError("ircut value must be 0 or 1")
+
+        return {
+            "cmd": "ircut",
+            "val": resolved_value,
+        }
+
+    async def _send_get(self, endpoint_path: str, params: dict) -> None:
+        """Call a camera API endpoint with query params."""
         session = async_get_clientsession(self._hass)
-        url = f"{self._base_url.rstrip('/')}/{MOTOR_ENDPOINT_PATH.lstrip('/')}"
-        params = self._build_command_params(command, step_size)
+        url = f"{self._base_url.rstrip('/')}/{endpoint_path.lstrip('/')}"
         headers = self._build_headers()
 
         try:
@@ -124,12 +136,20 @@ class CameraMotorClient:
                 timeout=ClientTimeout(total=8),
             )
         except ClientError as err:
-            raise HomeAssistantError(
-                f"Could not reach camera motor API at {url}: {err}"
-            ) from err
+            raise HomeAssistantError(f"Could not reach camera API at {url}: {err}") from err
 
         if response.status >= 400:
             body = await response.text()
             raise HomeAssistantError(
-                f"Camera motor API returned {response.status} for {response.url}: {body}"
+                f"Camera API returned {response.status} for {response.url}: {body}"
             )
+
+    async def send_command(self, command: str, step_size: float | None = None) -> None:
+        """Call the local camera API for a motor command."""
+        params = self._build_command_params(command, step_size)
+        await self._send_get(MOTOR_ENDPOINT_PATH, params)
+
+    async def send_ircut(self, value: int) -> None:
+        """Call the local camera API to set ircut value (0 or 1)."""
+        params = self._build_ircut_params(value)
+        await self._send_get(IMP_ENDPOINT_PATH, params)

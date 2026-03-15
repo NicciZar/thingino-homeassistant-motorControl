@@ -1,6 +1,16 @@
 const CARD_TYPE_STANDARD = "custom:thingino-motor-control-card";
 const CARD_TYPE_COMPACT = "custom:thingino-motor-control-compact-card";
 const DEFAULT_STEP_SIZE = 40.5;
+const IR_MODE_DAY = "day";
+const IR_MODE_NIGHT = "night";
+
+function normalizeIrMode(value) {
+  return value === IR_MODE_NIGHT ? IR_MODE_NIGHT : IR_MODE_DAY;
+}
+
+function nextIrMode(mode) {
+  return normalizeIrMode(mode) === IR_MODE_DAY ? IR_MODE_NIGHT : IR_MODE_DAY;
+}
 
 function toPositiveNumberOrNull(value) {
   if (value === null || value === undefined || value === "") {
@@ -38,6 +48,7 @@ class ThinginoMotorControlCard extends HTMLElement {
     this._config = null;
     this._hass = null;
     this._compactMode = false;
+    this._irMode = IR_MODE_DAY;
   }
 
   setConfig(config) {
@@ -58,6 +69,7 @@ class ThinginoMotorControlCard extends HTMLElement {
       compact: compactMode,
     };
     this._compactMode = compactMode;
+    this._irMode = normalizeIrMode(this._config.ir_mode);
 
     this._render();
   }
@@ -68,9 +80,21 @@ class ThinginoMotorControlCard extends HTMLElement {
 
   getCardSize() {
     if (this._compactMode) {
-      return this._config && this._config.show_title === false ? 2 : 3;
+      return this._config && this._config.show_title === false ? 3 : 4;
     }
-    return 4;
+    return 5;
+  }
+
+  _targetData() {
+    const data = {};
+    if (this._config.host) {
+      data.host = this._config.host;
+    }
+    if (this._config.entry_id) {
+      data.entry_id = this._config.entry_id;
+    }
+
+    return data;
   }
 
   _resolveStepSize(serviceName) {
@@ -93,13 +117,7 @@ class ThinginoMotorControlCard extends HTMLElement {
   }
 
   _serviceData(serviceName) {
-    const data = {};
-    if (this._config.host) {
-      data.host = this._config.host;
-    }
-    if (this._config.entry_id) {
-      data.entry_id = this._config.entry_id;
-    }
+    const data = this._targetData();
 
     if (serviceName !== "stop") {
       data.step_size = this._resolveStepSize(serviceName);
@@ -117,6 +135,21 @@ class ThinginoMotorControlCard extends HTMLElement {
     this._hass.callService("thingino_motor_control", serviceName, data);
   }
 
+  _callIrMode(irMode) {
+    if (!this._hass || !this._config) {
+      return;
+    }
+
+    this._hass.callService("thingino_motor_control", "set_ircut", {
+      ...this._targetData(),
+      ir_mode: irMode,
+    });
+
+    // Keep the UI toggle state in sync with the last command sent.
+    this._irMode = irMode;
+    this._render();
+  }
+
   _render() {
     if (!this.shadowRoot || !this._config) {
       return;
@@ -131,6 +164,13 @@ class ThinginoMotorControlCard extends HTMLElement {
     const titleFont = this._compactMode ? "0.9rem" : "1rem";
     const subtitleFont = this._compactMode ? "0.75rem" : "0.8rem";
     const subtitleMargin = this._compactMode ? 8 : 12;
+    const irButtonFont = this._compactMode ? "0.75rem" : "0.8rem";
+    const irButtonPadding = this._compactMode ? "6px 8px" : "8px 10px";
+    const irNextMode = nextIrMode(this._irMode);
+    const irButtonIcon = irNextMode === IR_MODE_DAY
+      ? "mdi:white-balance-sunny"
+      : "mdi:weather-night";
+    const irButtonLabel = irNextMode === IR_MODE_DAY ? "Switch to Day" : "Switch to Night";
 
     const headerHtml = showTitle
       ? `<div class="title">${this._config.title}</div>
@@ -164,6 +204,7 @@ class ThinginoMotorControlCard extends HTMLElement {
           gap: ${controlGap}px;
           align-items: center;
           justify-items: center;
+          margin-bottom: ${this._compactMode ? 6 : 8}px;
         }
 
         .empty {
@@ -182,6 +223,26 @@ class ThinginoMotorControlCard extends HTMLElement {
           display: inline-flex;
           align-items: center;
           justify-content: center;
+        }
+
+        .ir-controls {
+          display: grid;
+          grid-template-columns: 1fr;
+          gap: ${controlGap}px;
+        }
+
+        .ir-controls button {
+          width: 100%;
+          height: auto;
+          padding: ${irButtonPadding};
+          border-radius: ${borderRadius}px;
+          gap: 6px;
+          font-size: ${irButtonFont};
+          font-weight: 600;
+        }
+
+        .ir-controls ha-icon {
+          --mdc-icon-size: ${this._compactMode ? 16 : 18}px;
         }
 
         button:hover {
@@ -219,12 +280,24 @@ class ThinginoMotorControlCard extends HTMLElement {
           </button>
           <div class="empty"></div>
         </div>
+        <div class="ir-controls">
+          <button type="button" data-ir-toggle="true" title="Toggle IR mode">
+            <ha-icon icon="${irButtonIcon}"></ha-icon>
+            ${irButtonLabel}
+          </button>
+        </div>
       </ha-card>
     `;
 
     this.shadowRoot.querySelectorAll("button[data-service]").forEach((button) => {
       button.addEventListener("click", () => {
         this._callService(button.dataset.service);
+      });
+    });
+
+    this.shadowRoot.querySelectorAll("button[data-ir-toggle]").forEach((button) => {
+      button.addEventListener("click", () => {
+        this._callIrMode(nextIrMode(this._irMode));
       });
     });
   }

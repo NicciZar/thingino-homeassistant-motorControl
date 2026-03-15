@@ -13,10 +13,14 @@ from .api import CameraMotorClient
 from .const import (
     CONF_HOST,
     CONF_ENTRY_ID,
+    CONF_IR_MODE,
+    CONF_IR_MODE_CAMEL,
     CONF_STEP_SIZE,
+    CONF_VALUE,
     DATA_ENTRIES,
     DATA_SERVICES_REGISTERED,
     DOMAIN,
+    SERVICE_SET_IRCUT,
     SERVICE_TO_COMMAND,
 )
 
@@ -25,6 +29,19 @@ BASE_SERVICE_SCHEMA = vol.Schema(
         vol.Optional(CONF_ENTRY_ID): str,
         vol.Optional(CONF_HOST): str,
         vol.Optional(CONF_STEP_SIZE): vol.All(vol.Coerce(float), vol.Range(min=0.1)),
+    }
+)
+
+IRCUT_SERVICE_SCHEMA = vol.Schema(
+    {
+        vol.Optional(CONF_ENTRY_ID): str,
+        vol.Optional(CONF_HOST): str,
+        vol.Optional(CONF_IR_MODE): vol.All(str, vol.Lower, vol.In(["day", "night"])),
+        vol.Optional(CONF_IR_MODE_CAMEL): vol.All(
+            str, vol.Lower, vol.In(["day", "night"])
+        ),
+        # Backward compatibility with older service calls.
+        vol.Optional(CONF_VALUE): vol.All(vol.Coerce(int), vol.In([0, 1])),
     }
 )
 
@@ -93,6 +110,22 @@ async def _handle_command(call: ServiceCall, hass: HomeAssistant, command: str) 
     await client.send_command(command, step_size=step_size)
 
 
+async def _handle_ircut(call: ServiceCall, hass: HomeAssistant) -> None:
+    entry_id = call.data.get(CONF_ENTRY_ID)
+    host = call.data.get(CONF_HOST)
+    ir_mode = call.data.get(CONF_IR_MODE) or call.data.get(CONF_IR_MODE_CAMEL)
+    if ir_mode is not None:
+        value = 1 if ir_mode == "day" else 0
+    else:
+        value = call.data.get(CONF_VALUE)
+        if value is None:
+            raise HomeAssistantError(
+                "set_ircut requires ir_mode='day' or ir_mode='night'"
+            )
+    client = _resolve_client(hass, entry_id, host)
+    await client.send_ircut(value)
+
+
 async def async_setup_services(hass: HomeAssistant) -> None:
     """Register domain services once."""
     domain_data = hass.data.setdefault(DOMAIN, {})
@@ -115,6 +148,16 @@ async def async_setup_services(hass: HomeAssistant) -> None:
             schema=BASE_SERVICE_SCHEMA,
         )
 
+    async def _ircut_service_handler(call: ServiceCall) -> None:
+        await _handle_ircut(call, hass)
+
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_SET_IRCUT,
+        _ircut_service_handler,
+        schema=IRCUT_SERVICE_SCHEMA,
+    )
+
     domain_data[DATA_SERVICES_REGISTERED] = True
 
 
@@ -126,5 +169,7 @@ async def async_unload_services(hass: HomeAssistant) -> None:
 
     for service_name in SERVICE_TO_COMMAND:
         hass.services.async_remove(DOMAIN, service_name)
+
+    hass.services.async_remove(DOMAIN, SERVICE_SET_IRCUT)
 
     domain_data[DATA_SERVICES_REGISTERED] = False
