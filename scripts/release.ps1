@@ -172,8 +172,29 @@ else {
 
 if (-not $SkipGitHubRelease) {
     if (Get-Command gh -ErrorAction SilentlyContinue) {
-        gh release view $tag --json tagName *> $null
-        $releaseExists = ($LASTEXITCODE -eq 0)
+        $releaseExists = $false
+
+        # gh returns exit code 1 when a release does not exist; treat that as normal.
+        $nativePrefVar = Get-Variable -Name PSNativeCommandUseErrorActionPreference -ErrorAction SilentlyContinue
+        if ($nativePrefVar) {
+            $oldNativePref = $PSNativeCommandUseErrorActionPreference
+            $PSNativeCommandUseErrorActionPreference = $false
+        }
+
+        $oldErrorActionPreference = $ErrorActionPreference
+        $ErrorActionPreference = "Continue"
+
+        try {
+            $null = & gh release view $tag --json tagName 2>$null
+            $releaseExists = ($LASTEXITCODE -eq 0)
+        }
+        finally {
+            $ErrorActionPreference = $oldErrorActionPreference
+            if ($nativePrefVar) {
+                $PSNativeCommandUseErrorActionPreference = $oldNativePref
+            }
+        }
+
         if ($releaseExists) {
             Write-Host "GitHub release '$tag' already exists. Skipping release creation."
             Write-Host "Release flow completed successfully for $tag"
