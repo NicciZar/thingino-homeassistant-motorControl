@@ -54,6 +54,8 @@ function Convert-ToTrimmedText {
     return ([string]$Value).Trim()
 }
 
+try {
+
 Assert-CommandExists -CommandName "git"
 
 $repoRootRaw = git rev-parse --show-toplevel 2>$null
@@ -102,7 +104,18 @@ if ($currentBranch -ne "main") {
 if (-not $AllowDirty) {
     $dirty = git status --porcelain
     if ($dirty) {
-        throw "Working tree has uncommitted changes. Commit/stash first or rerun with -AllowDirty."
+        $dirtyLines = @($dirty)
+        $previewLines = @($dirtyLines | Select-Object -First 8)
+        $previewText = ($previewLines | ForEach-Object { "  $_" }) -join "`n"
+        $remaining = $dirtyLines.Count - $previewLines.Count
+        $remainingText = if ($remaining -gt 0) {
+            "`n  ... and $remaining more"
+        }
+        else {
+            ""
+        }
+
+        throw "Working tree has uncommitted changes.`n$previewText$remainingText`nCommit/stash first, or rerun with -AllowDirty."
     }
 }
 
@@ -244,3 +257,17 @@ if (-not $SkipGitHubRelease) {
 }
 
 Write-Host "Release flow completed successfully for $tag"
+
+}
+catch {
+    $message = $_.Exception.Message
+    Write-Host ""
+    Write-Host "Release script failed:" -ForegroundColor Red
+    Write-Host "  $message" -ForegroundColor Red
+    Write-Host ""
+    Write-Host "Hints:" -ForegroundColor Yellow
+    Write-Host "  - Use -Yes in non-interactive terminals"
+    Write-Host "  - Use -AllowDirty if you want to release with local changes"
+    Write-Host "  - Use -ReuseTag if the release tag already exists"
+    exit 1
+}
