@@ -268,13 +268,28 @@ class ThinginoMotorControlCard extends HTMLElement {
     this._render();
 
     try {
-      const result = await this._hass.callService(
-        "thingino_motor_control",
-        "get_heartbeat",
-        this._targetData(),
-        undefined,
-        true
-      );
+      let result = null;
+      const serviceData = this._targetData();
+
+      // Prefer REST call with explicit return_response for broad HA frontend compatibility.
+      try {
+        result = await this._hass.callApi(
+          "POST",
+          "services/thingino_motor_control/get_heartbeat?return_response=1",
+          serviceData
+        );
+      }
+      catch (apiErr) {
+        // Fallback to callService for environments where callApi behavior differs.
+        result = await this._hass.callService(
+          "thingino_motor_control",
+          "get_heartbeat",
+          serviceData,
+          undefined,
+          true
+        );
+      }
+
       const payload = this._extractServiceResponse(result);
       if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
         throw new Error("Camera heartbeat response was empty, wrapped, or invalid.");
@@ -470,9 +485,9 @@ class ThinginoMotorControlCard extends HTMLElement {
 
         .ir-switch {
           width: 100%;
-          display: flex;
+          display: grid;
+          grid-template-columns: 1fr auto;
           align-items: center;
-          justify-content: flex-start;
           border-radius: ${borderRadius}px;
           background: var(--secondary-background-color);
           padding: ${this._compactMode ? "6px 8px" : "8px 10px"};
@@ -484,7 +499,7 @@ class ThinginoMotorControlCard extends HTMLElement {
           width: 100%;
           display: flex;
           align-items: center;
-          gap: 8px;
+          gap: 6px;
           font-weight: 600;
           cursor: pointer;
         }
@@ -492,7 +507,7 @@ class ThinginoMotorControlCard extends HTMLElement {
         .ir-switch-state {
           color: var(--secondary-text-color);
           font-size: ${this._compactMode ? "0.72rem" : "0.78rem"};
-          margin-left: auto;
+          margin-left: 6px;
         }
 
         .ir-switch input[type="checkbox"] {
@@ -604,16 +619,17 @@ class ThinginoMotorControlCard extends HTMLElement {
         </div>
         <div class="ir-controls">
           <div class="ir-switch" title="Enable or disable IR night mode">
-            <label class="ir-switch-label">
-              <input
-                type="checkbox"
-                data-ir-enabled="true"
-                ${this._irEnabled ? "checked" : ""}
-              />
+            <label class="ir-switch-label" for="ir-enabled-input">
               <ha-icon icon="${irIcon}"></ha-icon>
               IR
               <span class="ir-switch-state">${irState}</span>
             </label>
+            <input
+              id="ir-enabled-input"
+              type="checkbox"
+              data-ir-enabled="true"
+              ${this._irEnabled ? "checked" : ""}
+            />
           </div>
         </div>
         ${heartbeatSectionHtml}
