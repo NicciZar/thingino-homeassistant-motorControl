@@ -54,9 +54,8 @@ Prerequisites:
 
 Steps:
 
-1. Update `custom_components/thingino_motor_control/manifest.json` `version`.
-2. Commit and push your changes to `main`.
-3. Run:
+1. Commit and push your changes to `main`.
+2. Run:
 
 ```powershell
 ./scripts/release.ps1
@@ -66,18 +65,21 @@ What the script does:
 
 - Verifies clean working tree (unless `-AllowDirty` is used)
 - Verifies current branch is `main`
-- Verifies `manifest.json` version is valid and matches release version
-- Creates and pushes tag `v<manifest-version>`
+- Shows change summary (files changed + insertions/deletions)
+- Automatically bumps `manifest.json` version and commits it
+- Creates and pushes tag `v<new-version>`
 - Creates GitHub release with generated notes when `gh` is available
+- Runs non-interactively (no Y/N prompt)
 
 Useful flags:
 
-- `-Yes` skip confirmation prompt
+- `-DryRun` preview version/tag/actions without changing files or pushing
 - `-SkipGitHubRelease` push tag only
 - `-Draft` create draft GitHub release
 - `-Prerelease` mark GitHub release as pre-release
 - `-ReuseTag` continue if local/remote tag already exists
-- `-Version 0.3.1` explicitly set release version (must match manifest)
+- `-BumpType auto|major|minor|patch` choose bump strategy (`auto` default)
+- `-Version 0.6.2` explicitly set release version
 
 ## Camera API used
 
