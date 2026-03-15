@@ -43,6 +43,41 @@ Each configured camera keeps its own auth configuration, so different cameras ca
 6. Go to Settings -> Devices & services -> Add integration.
 7. Add `Thingino Camera Motor Control` and enter camera host and optional auth header.
 
+## Creating releases (HACS-friendly)
+
+Use the release script to avoid invalid refs and ensure HACS can install a stable tag.
+
+Prerequisites:
+
+- `git` installed and authenticated for `origin`
+- optional: `gh` CLI logged in (for automatic GitHub release creation)
+
+Steps:
+
+1. Update `custom_components/thingino_motor_control/manifest.json` `version`.
+2. Commit and push your changes to `main`.
+3. Run:
+
+```powershell
+./scripts/release.ps1
+```
+
+What the script does:
+
+- Verifies clean working tree (unless `-AllowDirty` is used)
+- Verifies current branch is `main`
+- Verifies `manifest.json` version is valid and matches release version
+- Creates and pushes tag `v<manifest-version>`
+- Creates GitHub release with generated notes when `gh` is available
+
+Useful flags:
+
+- `-Yes` skip confirmation prompt
+- `-SkipGitHubRelease` push tag only
+- `-Draft` create draft GitHub release
+- `-Prerelease` mark GitHub release as pre-release
+- `-Version 0.3.1` explicitly set release version (must match manifest)
+
 ## Camera API used
 
 The integration now calls your endpoint format:

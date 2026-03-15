@@ -1,0 +1,156 @@
+param(
+    [string]$Version,
+    [switch]$SkipGitHubRelease,
+    [switch]$Draft,
+    [switch]$Prerelease,
+    [switch]$AllowDirty,
+    [switch]$Yes
+)
+
+Set-StrictMode -Version Latest
+$ErrorActionPreference = "Stop"
+
+function Assert-CommandExists {
+    param([string]$CommandName)
+
+    if (-not (Get-Command $CommandName -ErrorAction SilentlyContinue)) {
+        throw "Required command '$CommandName' was not found in PATH."
+    }
+}
+
+function Get-HttpsRepoUrl {
+    param([string]$RemoteUrl)
+
+    if ($RemoteUrl -match "^https://") {
+        return ($RemoteUrl -replace "\\.git$", "")
+    }
+
+    if ($RemoteUrl -match "^git@github.com:(.+?)\.git$") {
+        return "https://github.com/$($Matches[1])"
+    }
+
+    if ($RemoteUrl -match "^git@github.com:(.+)$") {
+        return "https://github.com/$($Matches[1])"
+    }
+
+    return $RemoteUrl
+}
+
+Assert-CommandExists -CommandName "git"
+
+$repoRoot = (git rev-parse --show-toplevel).Trim()
+if (-not $repoRoot) {
+    throw "Could not determine git repository root."
+}
+
+Set-Location $repoRoot
+
+$manifestPath = Join-Path $repoRoot "custom_components/thingino_motor_control/manifest.json"
+if (-not (Test-Path $manifestPath)) {
+    throw "manifest.json not found at expected path: $manifestPath"
+}
+
+$manifestJson = Get-Content -Raw -Path $manifestPath | ConvertFrom-Json
+$manifestVersion = [string]$manifestJson.version
+if ([string]::IsNullOrWhiteSpace($manifestVersion)) {
+    throw "manifest.json does not contain a valid 'version'."
+}
+
+if ([string]::IsNullOrWhiteSpace($Version)) {
+    $Version = $manifestVersion
+}
+
+$semverPattern = '^\d+\.\d+\.\d+([\-+][0-9A-Za-z\.-]+)?$'
+if ($Version -notmatch $semverPattern) {
+    throw "Version '$Version' is not a valid semver-like value (example: 1.2.3 or 1.2.3-beta.1)."
+}
+
+if ($Version -ne $manifestVersion) {
+    throw "Version mismatch: manifest.json has '$manifestVersion' but release version is '$Version'. Update manifest first."
+}
+
+$tag = "v$Version"
+$currentBranch = (git branch --show-current).Trim()
+if (-not $currentBranch) {
+    throw "Could not determine current branch."
+}
+
+if ($currentBranch -ne "main") {
+    throw "Current branch is '$currentBranch'. Switch to 'main' before releasing."
+}
+
+if (-not $AllowDirty) {
+    $dirty = git status --porcelain
+    if ($dirty) {
+        throw "Working tree has uncommitted changes. Commit/stash first or rerun with -AllowDirty."
+    }
+}
+
+$localTagExists = (git tag --list $tag).Trim()
+if ($localTagExists) {
+    throw "Local tag '$tag' already exists."
+}
+
+Write-Host "Fetching remote tags..."
+git fetch --tags origin | Out-Null
+
+$remoteTagExists = (git ls-remote --tags origin "refs/tags/$tag").Trim()
+if ($remoteTagExists) {
+    throw "Remote tag '$tag' already exists on origin."
+}
+
+$remoteUrl = (git remote get-url origin).Trim()
+$repoUrl = Get-HttpsRepoUrl -RemoteUrl $remoteUrl
+
+Write-Host "Ready to create release:"
+Write-Host "- Repository: $repoUrl"
+Write-Host "- Branch: $currentBranch"
+Write-Host "- Version: $Version"
+Write-Host "- Tag: $tag"
+Write-Host "- Create GitHub release: $(-not $SkipGitHubRelease)"
+
+if (-not $Yes) {
+    $confirmation = Read-Host "Continue? [y/N]"
+    if ($confirmation -notin @("y", "Y", "yes", "YES")) {
+        throw "Release aborted by user."
+    }
+}
+
+Write-Host "Pushing branch '$currentBranch'..."
+git push origin $currentBranch
+
+Write-Host "Creating annotated tag '$tag'..."
+git tag -a $tag -m "Release $tag"
+
+Write-Host "Pushing tag '$tag'..."
+git push origin $tag
+
+if (-not $SkipGitHubRelease) {
+    if (Get-Command gh -ErrorAction SilentlyContinue) {
+        $ghArgs = @(
+            "release",
+            "create",
+            $tag,
+            "--title",
+            $tag,
+            "--generate-notes"
+        )
+
+        if ($Draft) {
+            $ghArgs += "--draft"
+        }
+
+        if ($Prerelease) {
+            $ghArgs += "--prerelease"
+        }
+
+        Write-Host "Creating GitHub release via gh CLI..."
+        gh @ghArgs
+    }
+    else {
+        Write-Warning "gh CLI not found. Tag was pushed, but release was not created automatically."
+        Write-Host "Create release manually: $repoUrl/releases/new?tag=$tag"
+    }
+}
+
+Write-Host "Release flow completed successfully for $tag"
