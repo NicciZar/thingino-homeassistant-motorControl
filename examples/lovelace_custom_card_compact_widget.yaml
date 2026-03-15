@@ -1,0 +1,4 @@
+type: custom:thingino-motor-control-compact-card
+title: Front Camera Compact
+host: 192.168.178.118
+show_title: false

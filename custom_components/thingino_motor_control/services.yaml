@@ -10,7 +10,7 @@ move_up:
         text:
     host:
       name: Host
-      description: Optional camera host (for example 192.168.178.118). Use this or entry_id.
+      description: Optional camera host (for example 192.168.178.118 or http://192.168.178.118). Use this or entry_id.
       required: false
       selector:
         text:
@@ -27,7 +27,7 @@ move_down:
         text:
     host:
       name: Host
-      description: Optional camera host (for example 192.168.178.118). Use this or entry_id.
+      description: Optional camera host (for example 192.168.178.118 or http://192.168.178.118). Use this or entry_id.
       required: false
       selector:
         text:
@@ -44,7 +44,7 @@ move_left:
         text:
     host:
       name: Host
-      description: Optional camera host (for example 192.168.178.118). Use this or entry_id.
+      description: Optional camera host (for example 192.168.178.118 or http://192.168.178.118). Use this or entry_id.
       required: false
       selector:
         text:
@@ -61,7 +61,7 @@ move_right:
         text:
     host:
       name: Host
-      description: Optional camera host (for example 192.168.178.118). Use this or entry_id.
+      description: Optional camera host (for example 192.168.178.118 or http://192.168.178.118). Use this or entry_id.
       required: false
       selector:
         text:
@@ -78,7 +78,7 @@ stop:
         text:
     host:
       name: Host
-      description: Optional camera host (for example 192.168.178.118). Use this or entry_id.
+      description: Optional camera host (for example 192.168.178.118 or http://192.168.178.118). Use this or entry_id.
       required: false
       selector:
         text:

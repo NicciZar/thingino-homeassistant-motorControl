@@ -47,3 +47,6 @@ SERVICE_TO_COMMAND = {
 
 DATA_ENTRIES = "entries"
 DATA_SERVICES_REGISTERED = "services_registered"
+DATA_FRONTEND_REGISTERED = "frontend_registered"
+
+FRONTEND_CARD_URL = "/thingino_motor_control/thingino-motor-control-card.js"

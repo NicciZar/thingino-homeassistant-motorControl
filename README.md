@@ -107,9 +107,53 @@ When calling a service, target a camera with one of:
 - `entry_id` (config entry id)
 - `host` (recommended, easier for dashboard YAML)
 
+`host` matching accepts either plain host/IP (`192.168.178.118`) or URL form (`http://192.168.178.118`).
+
 If multiple cameras are configured and neither `entry_id` nor `host` is provided, the service call returns an error to avoid moving the wrong camera.
 
 ## Lovelace control widget example
+
+This integration now includes a selectable custom card widget with a visual editor.
+
+### 1) Add the card resource once
+
+In Home Assistant:
+
+1. Settings -> Dashboards -> three dots -> Resources
+2. Add resource URL:
+
+`/thingino_motor_control/thingino-motor-control-card.js`
+
+3. Resource type: `JavaScript Module`
+
+### 2) Add the widget from card picker
+
+1. Edit dashboard -> Add card
+2. Choose `Thingino Motor Control` (regular) or `Thingino Motor Control Compact`
+3. Enter `Host` in the card editor (or `entry_id`)
+4. Save
+
+Example YAML for the custom card:
+
+```yaml
+type: custom:thingino-motor-control-card
+title: Front Camera
+host: 192.168.178.118
+show_title: true
+```
+
+Example YAML for the compact custom card:
+
+```yaml
+type: custom:thingino-motor-control-compact-card
+title: Front Camera Compact
+host: 192.168.178.118
+show_title: false
+```
+
+`show_title` is optional and defaults to `true`.
+
+## Manual card fallback
 
 Use a manual card with service buttons:
 
@@ -159,3 +203,5 @@ data:
 ```
 
 The same widget is also available at `examples/lovelace_motor_widget.yaml`.
+Custom-card example is at `examples/lovelace_custom_card_widget.yaml`.
+Compact custom-card example is at `examples/lovelace_custom_card_compact_widget.yaml`.

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from urllib.parse import urlsplit
+
 import voluptuous as vol
 
 from homeassistant.core import HomeAssistant, ServiceCall
@@ -25,6 +27,28 @@ BASE_SERVICE_SCHEMA = vol.Schema(
 )
 
 
+def _host_match_candidates(value: str) -> set[str]:
+    """Return normalized host candidates for robust comparisons.
+
+    Supports plain IP/host values and full URLs.
+    """
+    raw = value.strip().lower()
+    if not raw:
+        return set()
+
+    parsed = urlsplit(raw if "://" in raw else f"//{raw}")
+    hostname = parsed.hostname
+    port = parsed.port
+
+    candidates = {raw.rstrip("/")}
+    if hostname:
+        candidates.add(hostname)
+        if port:
+            candidates.add(f"{hostname}:{port}")
+
+    return candidates
+
+
 def _resolve_client(
     hass: HomeAssistant,
     entry_id: str | None,
@@ -43,9 +67,10 @@ def _resolve_client(
         return client
 
     if host:
-        normalized_host = host.strip().lower()
+        host_candidates = _host_match_candidates(host)
         for client in entries.values():
-            if client.host.strip().lower() == normalized_host:
+            client_candidates = _host_match_candidates(client.host)
+            if host_candidates.intersection(client_candidates):
                 return client
         raise HomeAssistantError(f"Unknown camera host: {host}")
 
