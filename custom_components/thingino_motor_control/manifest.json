@@ -1,9 +1,13 @@
-{
-  "domain": "thingino_motor_control",
-  "name": "Thingino Camera Motor Control",
-  "version": "0.6.2",
-  "config_flow": true,
-  "iot_class": "local_push",
-  "requirements": [],
-  "codeowners": []
+﻿{
+    "domain":  "thingino_motor_control",
+    "name":  "Thingino Camera Motor Control",
+    "version":  "0.7.0",
+    "config_flow":  true,
+    "iot_class":  "local_push",
+    "requirements":  [
+
+                     ],
+    "codeowners":  [
+
+                   ]
 }
