@@ -177,3 +177,49 @@ get_heartbeat:
       required: false
       selector:
         text:
+
+set_microphone:
+  name: Set Microphone
+  description: Enable or disable the camera microphone.
+  fields:
+    entry_id:
+      name: Entry ID
+      description: Optional config entry id. Use this or host to target a specific camera.
+      required: false
+      selector:
+        text:
+    host:
+      name: Host
+      description: Optional camera host (for example 192.168.178.118 or http://192.168.178.118). Use this or entry_id.
+      required: false
+      selector:
+        text:
+    enabled:
+      name: Enabled
+      description: Enable (true) or disable (false) the microphone.
+      required: true
+      selector:
+        boolean:
+
+set_speaker:
+  name: Set Speaker
+  description: Enable or disable the camera speaker.
+  fields:
+    entry_id:
+      name: Entry ID
+      description: Optional config entry id. Use this or host to target a specific camera.
+      required: false
+      selector:
+        text:
+    host:
+      name: Host
+      description: Optional camera host (for example 192.168.178.118 or http://192.168.178.118). Use this or entry_id.
+      required: false
+      selector:
+        text:
+    enabled:
+      name: Enabled
+      description: Enable (true) or disable (false) the speaker.
+      required: true
+      selector:
+        boolean:

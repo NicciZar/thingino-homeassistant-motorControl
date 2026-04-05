@@ -23,6 +23,8 @@ from .const import (
     DOMAIN,
     SERVICE_GET_HEARTBEAT,
     SERVICE_SET_IRCUT,
+    SERVICE_SET_MICROPHONE,
+    SERVICE_SET_SPEAKER,
     SERVICE_TO_COMMAND,
 )
 
@@ -51,6 +53,14 @@ HEARTBEAT_SERVICE_SCHEMA = vol.Schema(
     {
         vol.Optional(CONF_ENTRY_ID): str,
         vol.Optional(CONF_HOST): str,
+    }
+)
+
+AUDIO_SERVICE_SCHEMA = vol.Schema(
+    {
+        vol.Optional(CONF_ENTRY_ID): str,
+        vol.Optional(CONF_HOST): str,
+        vol.Required("enabled"): bool,
     }
 )
 
@@ -142,6 +152,22 @@ async def _handle_get_heartbeat(call: ServiceCall, hass: HomeAssistant) -> dict[
     return await client.get_heartbeat()
 
 
+async def _handle_set_microphone(call: ServiceCall, hass: HomeAssistant) -> None:
+    entry_id = call.data.get(CONF_ENTRY_ID)
+    host = call.data.get(CONF_HOST)
+    enabled = call.data["enabled"]
+    client = _resolve_client(hass, entry_id, host)
+    await client.set_microphone(enabled)
+
+
+async def _handle_set_speaker(call: ServiceCall, hass: HomeAssistant) -> None:
+    entry_id = call.data.get(CONF_ENTRY_ID)
+    host = call.data.get(CONF_HOST)
+    enabled = call.data["enabled"]
+    client = _resolve_client(hass, entry_id, host)
+    await client.set_speaker(enabled)
+
+
 async def async_setup_services(hass: HomeAssistant) -> None:
     """Register domain services once."""
     domain_data = hass.data.setdefault(DOMAIN, {})
@@ -185,6 +211,26 @@ async def async_setup_services(hass: HomeAssistant) -> None:
         supports_response=SupportsResponse.OPTIONAL,
     )
 
+    async def _microphone_service_handler(call: ServiceCall) -> None:
+        await _handle_set_microphone(call, hass)
+
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_SET_MICROPHONE,
+        _microphone_service_handler,
+        schema=AUDIO_SERVICE_SCHEMA,
+    )
+
+    async def _speaker_service_handler(call: ServiceCall) -> None:
+        await _handle_set_speaker(call, hass)
+
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_SET_SPEAKER,
+        _speaker_service_handler,
+        schema=AUDIO_SERVICE_SCHEMA,
+    )
+
     domain_data[DATA_SERVICES_REGISTERED] = True
 
 
@@ -199,5 +245,7 @@ async def async_unload_services(hass: HomeAssistant) -> None:
 
     hass.services.async_remove(DOMAIN, SERVICE_SET_IRCUT)
     hass.services.async_remove(DOMAIN, SERVICE_GET_HEARTBEAT)
+    hass.services.async_remove(DOMAIN, SERVICE_SET_MICROPHONE)
+    hass.services.async_remove(DOMAIN, SERVICE_SET_SPEAKER)
 
     domain_data[DATA_SERVICES_REGISTERED] = False

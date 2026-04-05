@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from urllib.parse import urlsplit
 
 from aiohttp import ClientError, ClientTimeout
@@ -24,6 +25,7 @@ from .const import (
     IMP_ENDPOINT_PATH,
     LOGIN_ENDPOINT_PATH,
     MOTOR_ENDPOINT_PATH,
+    PRUDYNT_ENDPOINT_PATH,
 )
 
 
@@ -227,6 +229,94 @@ class CameraMotorClient:
 
         return payload
 
+    async def _send_sse_get(
+        self,
+        endpoint_path: str,
+        params: dict | None = None,
+        *,
+        retry_on_auth_failure: bool = True,
+    ) -> dict:
+        """Call a camera API endpoint that returns Server-Sent Events (SSE)."""
+        # Ensure we're authenticated if using session-based auth
+        if self._username and self._password and not self._session_token:
+            await self._login()
+
+        session = async_get_clientsession(self._hass)
+        url = f"{self._base_url.rstrip('/')}/{endpoint_path.lstrip('/')}"
+        headers = self._build_headers()
+        headers["Accept"] = "text/event-stream"
+        headers["Cache-Control"] = "no-cache"
+
+        try:
+            response = await session.get(
+                url,
+                params=params,
+                headers=headers,
+                timeout=ClientTimeout(total=8),
+            )
+        except ClientError as err:
+            raise HomeAssistantError(f"Could not reach camera API at {url}: {err}") from err
+
+        # Handle authentication failure by re-logging in and retrying once
+        if response.status in (401, 403) and retry_on_auth_failure and self._username and self._password:
+            self._session_token = None  # Clear expired token
+            await self._login()
+            return await self._send_sse_get(
+                endpoint_path,
+                params,
+                retry_on_auth_failure=False,  # Prevent infinite retry loop
+            )
+
+        if response.status >= 400:
+            body = await response.text()
+            raise HomeAssistantError(
+                f"Camera API returned {response.status} for {response.url}: {body}"
+            )
+
+        # Read the SSE stream and parse the first event
+        try:
+            text = await response.text()
+        except Exception as err:
+            raise HomeAssistantError(f"Failed to read SSE stream from {url}: {err}") from err
+
+        # Parse SSE format: look for JSON data in the event stream
+        # SSE format can be: "data: {...}\n\n" or just the JSON directly
+        lines = text.strip().split('\n')
+        json_data = None
+        
+        for line in lines:
+            line = line.strip()
+            if not line:
+                continue
+            
+            # Check if line starts with "data: "
+            if line.startswith("data: "):
+                json_data = line[6:]  # Remove "data: " prefix
+                break
+            # Sometimes SSE might send just the JSON without prefix
+            elif line.startswith("{"):
+                json_data = line
+                break
+
+        if not json_data:
+            raise HomeAssistantError(
+                f"No valid JSON data found in SSE stream from {url}. Response: {text[:200]}"
+            )
+
+        try:
+            payload = json.loads(json_data)
+        except json.JSONDecodeError as err:
+            raise HomeAssistantError(
+                f"Invalid JSON in SSE stream from {url}: {json_data[:200]}"
+            ) from err
+
+        if not isinstance(payload, dict):
+            raise HomeAssistantError(
+                f"Camera API returned unexpected SSE payload type: {type(payload).__name__}"
+            )
+
+        return payload
+
     async def send_command(self, command: str, step_size: float | None = None) -> None:
         """Call the local camera API for a motor command."""
         params = self._build_command_params(command, step_size)
@@ -238,9 +328,73 @@ class CameraMotorClient:
         await self._send_get(IMP_ENDPOINT_PATH, params)
 
     async def get_heartbeat(self) -> dict:
-        """Fetch heartbeat info from the camera."""
-        payload = await self._send_get(HEARTBEAT_ENDPOINT_PATH, expect_json=True)
-        if payload is None:
-            raise HomeAssistantError("Camera API returned no heartbeat payload")
+        """Fetch heartbeat info from the camera (Server-Sent Events format)."""
+        return await self._send_sse_get(HEARTBEAT_ENDPOINT_PATH)
 
-        return payload
+    async def _send_post(
+        self,
+        endpoint_path: str,
+        payload: dict,
+        *,
+        retry_on_auth_failure: bool = True,
+    ) -> dict:
+        """Call a camera API endpoint with POST and JSON payload."""
+        # Ensure we're authenticated if using session-based auth
+        if self._username and self._password and not self._session_token:
+            await self._login()
+
+        session = async_get_clientsession(self._hass)
+        url = f"{self._base_url.rstrip('/')}/{endpoint_path.lstrip('/')}"
+        headers = self._build_headers()
+        headers["Content-Type"] = "application/json"
+
+        try:
+            response = await session.post(
+                url,
+                json=payload,
+                headers=headers,
+                timeout=ClientTimeout(total=8),
+            )
+        except ClientError as err:
+            raise HomeAssistantError(f"Could not reach camera API at {url}: {err}") from err
+
+        # Handle authentication failure by re-logging in and retrying once
+        if response.status in (401, 403) and retry_on_auth_failure and self._username and self._password:
+            self._session_token = None  # Clear expired token
+            await self._login()
+            return await self._send_post(
+                endpoint_path,
+                payload,
+                retry_on_auth_failure=False,  # Prevent infinite retry loop
+            )
+
+        if response.status >= 400:
+            body = await response.text()
+            raise HomeAssistantError(
+                f"Camera API returned {response.status} for {response.url}: {body}"
+            )
+
+        try:
+            result = await response.json(content_type=None)
+        except ValueError as err:
+            body = await response.text()
+            raise HomeAssistantError(
+                f"Camera API returned invalid JSON for {response.url}: {body}"
+            ) from err
+
+        if not isinstance(result, dict):
+            raise HomeAssistantError(
+                f"Camera API returned unexpected payload type: {type(result).__name__}"
+            )
+
+        return result
+
+    async def set_microphone(self, enabled: bool) -> dict:
+        """Enable or disable the camera microphone."""
+        payload = {"audio": {"mic_enabled": enabled}}
+        return await self._send_post(PRUDYNT_ENDPOINT_PATH, payload)
+
+    async def set_speaker(self, enabled: bool) -> dict:
+        """Enable or disable the camera speaker."""
+        payload = {"audio": {"spk_enabled": enabled}}
+        return await self._send_post(PRUDYNT_ENDPOINT_PATH, payload)

@@ -25,6 +25,8 @@ SERVICE_MOVE_RIGHT = "move_right"
 SERVICE_STOP = "stop"
 SERVICE_SET_IRCUT = "set_ircut"
 SERVICE_GET_HEARTBEAT = "get_heartbeat"
+SERVICE_SET_MICROPHONE = "set_microphone"
+SERVICE_SET_SPEAKER = "set_speaker"
 
 COMMAND_UP = "up"
 COMMAND_DOWN = "down"
@@ -36,6 +38,7 @@ MOTOR_ENDPOINT_PATH = "/x/json-motor.cgi"
 IMP_ENDPOINT_PATH = "/x/json-imp.cgi"
 HEARTBEAT_ENDPOINT_PATH = "/x/json-heartbeat.cgi"
 LOGIN_ENDPOINT_PATH = "/x/login.cgi"
+PRUDYNT_ENDPOINT_PATH = "/x/json-prudynt.cgi"
 
 COMMAND_VECTORS = {
     COMMAND_UP: (0, -1),

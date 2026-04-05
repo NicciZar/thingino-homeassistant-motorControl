@@ -14,7 +14,9 @@ Custom Home Assistant integration for controlling a camera motor over local API 
   - `thingino_motor_control.stop`
   - `thingino_motor_control.set_ircut`
   - `thingino_motor_control.get_heartbeat`
-- Sends local HTTP `GET` requests to your camera API
+  - `thingino_motor_control.set_microphone`
+  - `thingino_motor_control.set_speaker`
+- Sends local HTTP `GET` and `POST` requests to your camera API
 
 ## Compatibility and Credits
 
@@ -110,7 +112,13 @@ The integration calls these endpoints:
   - Returns: `Set-Cookie: thingino_session=<token>`
 - `GET /x/json-motor.cgi?d=g&x=<value>&y=<value>` (motor control)
 - `GET /x/json-imp.cgi?cmd=ircut&val=<0|1>` (IR cut filter)
-- `GET /x/json-heartbeat.cgi` (status information)
+- `GET /x/json-heartbeat.cgi` (status information - Server-Sent Events format)
+  - Headers: `Accept: text/event-stream`
+  - Response: SSE stream with JSON data
+- `POST /x/json-prudynt.cgi` (audio settings)
+  - Microphone: `{"audio": {"mic_enabled": true/false}}`
+  - Speaker: `{"audio": {"spk_enabled": true/false}}`
+  - Response: Confirmation JSON with updated state
 
 The request is sent to the configured camera host and includes either:
 - Session cookie: `Cookie: thingino_session=<token>` (default for current firmware)
@@ -180,12 +188,12 @@ step_size_left: 20
 step_size_right: 20
 show_heartbeat: true
 show_heartbeat_time_now: true
-show_heartbeat_timezone: true
-show_heartbeat_memory: true
-show_heartbeat_overlay: false
-show_heartbeat_extras: false
-show_heartbeat_daynight: true
-show_heartbeat_uptime: true
+show_heartbeat_camera_status: true
+show_heartbeat_recording: true
+show_heartbeat_ir_states: true
+show_heartbeat_audio: true
+show_mic_control: true
+show_speaker_control: true
 ```
 
 Example YAML for the compact custom card:
@@ -205,7 +213,15 @@ step_size_down: 25
 The widget `step_size` is used for all movement directions (up/down/left/right).
 `step_size_up/down/left/right` are optional per-direction overrides.
 `show_heartbeat` enables the heartbeat panel.
-`show_heartbeat_*` toggles let you show/hide heartbeat field groups.
+`show_heartbeat_*` toggles let you show/hide heartbeat field groups:
+- `show_heartbeat_time_now`: Display current time
+- `show_heartbeat_camera_status`: Day/night mode, brightness, gain, motion detection, privacy mode
+- `show_heartbeat_recording`: Recording status for channels 0 and 1
+- `show_heartbeat_ir_states`: IR cut filter, IR 850nm/940nm LEDs, white LED states
+- `show_heartbeat_audio`: Microphone and speaker status
+
+`show_mic_control` enables an interactive microphone toggle switch.
+`show_speaker_control` enables an interactive speaker toggle switch.
 
 ## Manual card fallback
 

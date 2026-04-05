@@ -5,20 +5,22 @@ const IR_MODE_DAY = "day";
 const IR_MODE_NIGHT = "night";
 const HEARTBEAT_KEYS = [
   "time_now",
-  "timezone",
-  "mem_total",
-  "mem_active",
-  "mem_buffers",
-  "mem_cached",
-  "mem_free",
-  "overlay_total",
-  "overlay_used",
-  "overlay_free",
-  "extras_total",
-  "extras_used",
-  "extras_free",
-  "daynight_value",
-  "uptime",
+  "daynight_brightness",
+  "total_gain",
+  "daynight_mode",
+  "rec_ch0",
+  "rec_ch1",
+  "motion_enabled",
+  "privacy_enabled",
+  "color_mode",
+  "ircut_state",
+  "ir850_state",
+  "ir940_state",
+  "white_state",
+  "mic_enabled",
+  "spk_enabled",
+  "daynight_enabled",
+  "wg_status",
 ];
 
 function normalizeIrMode(value) {
@@ -111,6 +113,8 @@ class ThinginoMotorControlCard extends HTMLElement {
       show_title: true,
       step_size: DEFAULT_STEP_SIZE,
       show_heartbeat: false,
+      show_mic_control: false,
+      show_speaker_control: false,
     };
   }
 
@@ -121,6 +125,8 @@ class ThinginoMotorControlCard extends HTMLElement {
     this._hass = null;
     this._compactMode = false;
     this._irEnabled = false;
+    this._micEnabled = false;
+    this._speakerEnabled = false;
     this._heartbeatData = null;
     this._heartbeatLoading = false;
     this._heartbeatError = null;
@@ -142,17 +148,19 @@ class ThinginoMotorControlCard extends HTMLElement {
       step_size: DEFAULT_STEP_SIZE,
       show_heartbeat: false,
       show_heartbeat_time_now: true,
-      show_heartbeat_timezone: true,
-      show_heartbeat_memory: true,
-      show_heartbeat_overlay: true,
-      show_heartbeat_extras: true,
-      show_heartbeat_daynight: true,
-      show_heartbeat_uptime: true,
+      show_heartbeat_camera_status: true,
+      show_heartbeat_recording: true,
+      show_heartbeat_ir_states: true,
+      show_heartbeat_audio: true,
+      show_mic_control: false,
+      show_speaker_control: false,
       ...config,
       compact: compactMode,
     };
     this._compactMode = compactMode;
     this._irEnabled = isIrEnabledFromMode(this._config.ir_mode);
+    this._micEnabled = Boolean(this._config.mic_enabled);
+    this._speakerEnabled = Boolean(this._config.speaker_enabled);
     this._heartbeatData = null;
     this._heartbeatError = null;
 
@@ -251,6 +259,36 @@ class ThinginoMotorControlCard extends HTMLElement {
 
     // Keep the switch state in sync with the last command sent.
     this._irEnabled = enabled;
+    this._render();
+  }
+
+  _setMicEnabled(enabled) {
+    if (!this._hass || !this._config) {
+      return;
+    }
+
+    this._hass.callService("thingino_motor_control", "set_microphone", {
+      ...this._targetData(),
+      enabled: enabled,
+    });
+
+    // Keep the switch state in sync with the last command sent.
+    this._micEnabled = enabled;
+    this._render();
+  }
+
+  _setSpeakerEnabled(enabled) {
+    if (!this._hass || !this._config) {
+      return;
+    }
+
+    this._hass.callService("thingino_motor_control", "set_speaker", {
+      ...this._targetData(),
+      enabled: enabled,
+    });
+
+    // Keep the switch state in sync with the last command sent.
+    this._speakerEnabled = enabled;
     this._render();
   }
 
@@ -379,6 +417,12 @@ class ThinginoMotorControlCard extends HTMLElement {
     const irRowFont = this._compactMode ? "0.75rem" : "0.8rem";
     const irIcon = this._irEnabled ? "mdi:weather-night" : "mdi:white-balance-sunny";
     const irState = this._irEnabled ? "Enabled" : "Disabled";
+    const micIcon = this._micEnabled ? "mdi:microphone" : "mdi:microphone-off";
+    const micState = this._micEnabled ? "Enabled" : "Disabled";
+    const speakerIcon = this._speakerEnabled ? "mdi:volume-high" : "mdi:volume-off";
+    const speakerState = this._speakerEnabled ? "Enabled" : "Disabled";
+    const showMicControl = this._config.show_mic_control === true;
+    const showSpeakerControl = this._config.show_speaker_control === true;
     const showHeartbeat = this._config.show_heartbeat === true;
 
     if (
@@ -396,31 +440,29 @@ class ThinginoMotorControlCard extends HTMLElement {
       if (this._config.show_heartbeat_time_now !== false) {
         heartbeatRows.push(["Time", this._heartbeatTimeDisplay()]);
       }
-      if (this._config.show_heartbeat_timezone !== false) {
-        heartbeatRows.push(["Timezone", this._heartbeatValue("timezone")]);
+      if (this._config.show_heartbeat_camera_status !== false) {
+        heartbeatRows.push(["Day/Night Mode", this._heartbeatValue("daynight_mode")]);
+        heartbeatRows.push(["Day/Night Enabled", this._heartbeatValue("daynight_enabled")]);
+        heartbeatRows.push(["Brightness", this._heartbeatValue("daynight_brightness")]);
+        heartbeatRows.push(["Total Gain", this._heartbeatValue("total_gain")]);
+        heartbeatRows.push(["Color Mode", this._heartbeatValue("color_mode")]);
+        heartbeatRows.push(["Motion Detection", this._heartbeatValue("motion_enabled")]);
+        heartbeatRows.push(["Privacy Mode", this._heartbeatValue("privacy_enabled")]);
+        heartbeatRows.push(["WireGuard Status", this._heartbeatValue("wg_status")]);
       }
-      if (this._config.show_heartbeat_memory !== false) {
-        heartbeatRows.push(["Mem total", this._heartbeatValue("mem_total")]);
-        heartbeatRows.push(["Mem active", this._heartbeatValue("mem_active")]);
-        heartbeatRows.push(["Mem buffers", this._heartbeatValue("mem_buffers")]);
-        heartbeatRows.push(["Mem cached", this._heartbeatValue("mem_cached")]);
-        heartbeatRows.push(["Mem free", this._heartbeatValue("mem_free")]);
+      if (this._config.show_heartbeat_recording !== false) {
+        heartbeatRows.push(["Recording Ch0", this._heartbeatValue("rec_ch0")]);
+        heartbeatRows.push(["Recording Ch1", this._heartbeatValue("rec_ch1")]);
       }
-      if (this._config.show_heartbeat_overlay !== false) {
-        heartbeatRows.push(["Overlay total", this._heartbeatValue("overlay_total")]);
-        heartbeatRows.push(["Overlay used", this._heartbeatValue("overlay_used")]);
-        heartbeatRows.push(["Overlay free", this._heartbeatValue("overlay_free")]);
+      if (this._config.show_heartbeat_ir_states !== false) {
+        heartbeatRows.push(["IR Cut State", this._heartbeatValue("ircut_state")]);
+        heartbeatRows.push(["IR 850nm State", this._heartbeatValue("ir850_state")]);
+        heartbeatRows.push(["IR 940nm State", this._heartbeatValue("ir940_state")]);
+        heartbeatRows.push(["White LED State", this._heartbeatValue("white_state")]);
       }
-      if (this._config.show_heartbeat_extras !== false) {
-        heartbeatRows.push(["Extras total", this._heartbeatValue("extras_total")]);
-        heartbeatRows.push(["Extras used", this._heartbeatValue("extras_used")]);
-        heartbeatRows.push(["Extras free", this._heartbeatValue("extras_free")]);
-      }
-      if (this._config.show_heartbeat_daynight !== false) {
-        heartbeatRows.push(["Day/night value", this._heartbeatValue("daynight_value")]);
-      }
-      if (this._config.show_heartbeat_uptime !== false) {
-        heartbeatRows.push(["Uptime", this._heartbeatValue("uptime")]);
+      if (this._config.show_heartbeat_audio !== false) {
+        heartbeatRows.push(["Microphone", this._heartbeatValue("mic_enabled")]);
+        heartbeatRows.push(["Speaker", this._heartbeatValue("spk_enabled")]);
       }
     }
 
@@ -677,6 +719,36 @@ class ThinginoMotorControlCard extends HTMLElement {
               ${this._irEnabled ? "checked" : ""}
             />
           </div>
+          ${showMicControl ? `
+          <div class="ir-switch" title="Enable or disable microphone">
+            <label class="ir-switch-label" for="mic-enabled-input">
+              <ha-icon icon="${micIcon}"></ha-icon>
+              Microphone
+              <span class="ir-switch-state">${micState}</span>
+            </label>
+            <input
+              id="mic-enabled-input"
+              type="checkbox"
+              data-mic-enabled="true"
+              ${this._micEnabled ? "checked" : ""}
+            />
+          </div>
+          ` : ""}
+          ${showSpeakerControl ? `
+          <div class="ir-switch" title="Enable or disable speaker">
+            <label class="ir-switch-label" for="speaker-enabled-input">
+              <ha-icon icon="${speakerIcon}"></ha-icon>
+              Speaker
+              <span class="ir-switch-state">${speakerState}</span>
+            </label>
+            <input
+              id="speaker-enabled-input"
+              type="checkbox"
+              data-speaker-enabled="true"
+              ${this._speakerEnabled ? "checked" : ""}
+            />
+          </div>
+          ` : ""}
         </div>
         ${heartbeatSectionHtml}
       </ha-card>
@@ -691,6 +763,18 @@ class ThinginoMotorControlCard extends HTMLElement {
     this.shadowRoot.querySelectorAll('input[data-ir-enabled="true"]').forEach((input) => {
       input.addEventListener("change", () => {
         this._setIrEnabled(input.checked);
+      });
+    });
+
+    this.shadowRoot.querySelectorAll('input[data-mic-enabled="true"]').forEach((input) => {
+      input.addEventListener("change", () => {
+        this._setMicEnabled(input.checked);
+      });
+    });
+
+    this.shadowRoot.querySelectorAll('input[data-speaker-enabled="true"]').forEach((input) => {
+      input.addEventListener("change", () => {
+        this._setSpeakerEnabled(input.checked);
       });
     });
 
@@ -717,6 +801,8 @@ class ThinginoMotorControlCompactCard extends ThinginoMotorControlCard {
       show_title: false,
       step_size: DEFAULT_STEP_SIZE,
       show_heartbeat: false,
+      show_mic_control: false,
+      show_speaker_control: false,
     };
   }
 
@@ -799,12 +885,12 @@ class ThinginoMotorControlCardEditor extends HTMLElement {
     const showTitle = this._config.show_title !== false;
     const showHeartbeat = this._config.show_heartbeat === true;
     const showHeartbeatTimeNow = this._config.show_heartbeat_time_now !== false;
-    const showHeartbeatTimezone = this._config.show_heartbeat_timezone !== false;
-    const showHeartbeatMemory = this._config.show_heartbeat_memory !== false;
-    const showHeartbeatOverlay = this._config.show_heartbeat_overlay !== false;
-    const showHeartbeatExtras = this._config.show_heartbeat_extras !== false;
-    const showHeartbeatDaynight = this._config.show_heartbeat_daynight !== false;
-    const showHeartbeatUptime = this._config.show_heartbeat_uptime !== false;
+    const showHeartbeatCameraStatus = this._config.show_heartbeat_camera_status !== false;
+    const showHeartbeatRecording = this._config.show_heartbeat_recording !== false;
+    const showHeartbeatIrStates = this._config.show_heartbeat_ir_states !== false;
+    const showHeartbeatAudio = this._config.show_heartbeat_audio !== false;
+    const showMicControl = this._config.show_mic_control === true;
+    const showSpeakerControl = this._config.show_speaker_control === true;
 
     this.shadowRoot.innerHTML = `
       <style>
@@ -913,28 +999,28 @@ class ThinginoMotorControlCardEditor extends HTMLElement {
           Show heartbeat time
         </label>
         <label>
-          <input type="checkbox" data-key="show_heartbeat_timezone" ${showHeartbeatTimezone ? "checked" : ""} />
-          Show timezone
+          <input type="checkbox" data-key="show_heartbeat_camera_status" ${showHeartbeatCameraStatus ? "checked" : ""} />
+          Show camera status fields
         </label>
         <label>
-          <input type="checkbox" data-key="show_heartbeat_memory" ${showHeartbeatMemory ? "checked" : ""} />
-          Show memory fields
+          <input type="checkbox" data-key="show_heartbeat_recording" ${showHeartbeatRecording ? "checked" : ""} />
+          Show recording status
         </label>
         <label>
-          <input type="checkbox" data-key="show_heartbeat_overlay" ${showHeartbeatOverlay ? "checked" : ""} />
-          Show overlay fields
+          <input type="checkbox" data-key="show_heartbeat_ir_states" ${showHeartbeatIrStates ? "checked" : ""} />
+          Show IR/LED states
         </label>
         <label>
-          <input type="checkbox" data-key="show_heartbeat_extras" ${showHeartbeatExtras ? "checked" : ""} />
-          Show extras fields
+          <input type="checkbox" data-key="show_heartbeat_audio" ${showHeartbeatAudio ? "checked" : ""} />
+          Show audio (mic/speaker)
         </label>
         <label>
-          <input type="checkbox" data-key="show_heartbeat_daynight" ${showHeartbeatDaynight ? "checked" : ""} />
-          Show day/night value
+          <input type="checkbox" data-key="show_mic_control" ${showMicControl ? "checked" : ""} />
+          Show microphone control
         </label>
         <label>
-          <input type="checkbox" data-key="show_heartbeat_uptime" ${showHeartbeatUptime ? "checked" : ""} />
-          Show uptime
+          <input type="checkbox" data-key="show_speaker_control" ${showSpeakerControl ? "checked" : ""} />
+          Show speaker control
         </label>
         <div class="hint">Set host or entry_id. Host can be plain IP/host or URL.</div>
       </div>
@@ -951,12 +1037,12 @@ class ThinginoMotorControlCardEditor extends HTMLElement {
         show_title: this.shadowRoot.querySelector('input[data-key="show_title"]').checked,
         show_heartbeat: this.shadowRoot.querySelector('input[data-key="show_heartbeat"]').checked,
         show_heartbeat_time_now: this.shadowRoot.querySelector('input[data-key="show_heartbeat_time_now"]').checked,
-        show_heartbeat_timezone: this.shadowRoot.querySelector('input[data-key="show_heartbeat_timezone"]').checked,
-        show_heartbeat_memory: this.shadowRoot.querySelector('input[data-key="show_heartbeat_memory"]').checked,
-        show_heartbeat_overlay: this.shadowRoot.querySelector('input[data-key="show_heartbeat_overlay"]').checked,
-        show_heartbeat_extras: this.shadowRoot.querySelector('input[data-key="show_heartbeat_extras"]').checked,
-        show_heartbeat_daynight: this.shadowRoot.querySelector('input[data-key="show_heartbeat_daynight"]').checked,
-        show_heartbeat_uptime: this.shadowRoot.querySelector('input[data-key="show_heartbeat_uptime"]').checked,
+        show_heartbeat_camera_status: this.shadowRoot.querySelector('input[data-key="show_heartbeat_camera_status"]').checked,
+        show_heartbeat_recording: this.shadowRoot.querySelector('input[data-key="show_heartbeat_recording"]').checked,
+        show_heartbeat_ir_states: this.shadowRoot.querySelector('input[data-key="show_heartbeat_ir_states"]').checked,
+        show_heartbeat_audio: this.shadowRoot.querySelector('input[data-key="show_heartbeat_audio"]').checked,
+        show_mic_control: this.shadowRoot.querySelector('input[data-key="show_mic_control"]').checked,
+        show_speaker_control: this.shadowRoot.querySelector('input[data-key="show_speaker_control"]').checked,
       };
 
       const nextHost = this.shadowRoot

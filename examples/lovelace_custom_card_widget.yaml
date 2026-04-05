@@ -8,9 +8,9 @@ step_size_left: 20
 step_size_right: 20
 show_heartbeat: true
 show_heartbeat_time_now: true
-show_heartbeat_timezone: true
-show_heartbeat_memory: true
-show_heartbeat_overlay: false
-show_heartbeat_extras: false
-show_heartbeat_daynight: true
-show_heartbeat_uptime: true
+show_heartbeat_camera_status: true
+show_heartbeat_recording: true
+show_heartbeat_ir_states: true
+show_heartbeat_audio: true
+show_mic_control: true
+show_speaker_control: true
