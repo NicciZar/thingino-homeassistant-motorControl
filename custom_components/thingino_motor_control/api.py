@@ -273,34 +273,44 @@ class CameraMotorClient:
                 f"Camera API returned {response.status} for {response.url}: {body}"
             )
 
-        # Read the SSE stream and parse the first event
+        # Read the SSE stream until we get the first complete event
+        # SSE format: "data: {...}\n\n" where events are separated by double newline
         try:
-            text = await response.text()
+            buffer = ""
+            
+            # Read stream chunk by chunk until we have a complete event
+            async for chunk in response.content.iter_any():
+                buffer += chunk.decode('utf-8')
+                
+                # SSE events are terminated by double newline
+                if '\n\n' in buffer or '\r\n\r\n' in buffer:
+                    break
+                
+                # Limit buffer size to prevent memory issues
+                if len(buffer) > 100000:
+                    raise HomeAssistantError(f"SSE stream from {url} exceeded buffer limit")
+            
+            # Close the response to prevent hanging connection
+            response.close()
+            
         except Exception as err:
+            response.close()
             raise HomeAssistantError(f"Failed to read SSE stream from {url}: {err}") from err
 
-        # Parse SSE format: look for JSON data in the event stream
-        # SSE format can be: "data: {...}\n\n" or just the JSON directly
-        lines = text.strip().split('\n')
+        # Parse SSE format: look for JSON data in the event
         json_data = None
-        
-        for line in lines:
+        for line in buffer.split('\n'):
             line = line.strip()
-            if not line:
-                continue
-            
-            # Check if line starts with "data: "
             if line.startswith("data: "):
                 json_data = line[6:]  # Remove "data: " prefix
                 break
-            # Sometimes SSE might send just the JSON without prefix
             elif line.startswith("{"):
                 json_data = line
                 break
 
         if not json_data:
             raise HomeAssistantError(
-                f"No valid JSON data found in SSE stream from {url}. Response: {text[:200]}"
+                f"No valid JSON data found in SSE stream from {url}"
             )
 
         try:
