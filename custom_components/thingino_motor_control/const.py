@@ -35,6 +35,7 @@ COMMAND_STOP = "stop"
 MOTOR_ENDPOINT_PATH = "/x/json-motor.cgi"
 IMP_ENDPOINT_PATH = "/x/json-imp.cgi"
 HEARTBEAT_ENDPOINT_PATH = "/x/json-heartbeat.cgi"
+LOGIN_ENDPOINT_PATH = "/x/login.cgi"
 
 COMMAND_VECTORS = {
     COMMAND_UP: (0, -1),

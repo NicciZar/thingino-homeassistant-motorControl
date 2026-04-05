@@ -27,13 +27,22 @@ Custom Home Assistant integration for controlling a camera motor over local API 
 
 ## Authentication support
 
-This integration supports both methods:
+This integration supports two authentication methods:
 
-- Basic auth credentials: provide `username` and `password`, and the addon creates
-  `Authorization: Basic <base64(username:password)>` automatically for each request.
-- Custom auth header: provide `auth_header_name` and `auth_header_value` directly.
+**Session-based authentication (required for Thingino firmware):**
+- Provide `username` and `password` in the configuration
+- The addon automatically logs in via `POST /x/login.cgi` to obtain a session token
+- The session token (`thingino_session` cookie) is used for all subsequent requests
+- On session expiration (401/403 responses), the addon automatically re-authenticates
+- **This is the standard method for Thingino firmware (Basic auth is no longer supported)**
 
-Priority is custom header first, then generated Basic auth.
+**Custom auth header (advanced):**
+- For special use cases, provide `auth_header_name` and `auth_header_value` directly
+- This bypasses session-based authentication
+
+Priority order:
+1. Session-based auth (if username/password provided)
+2. Custom auth header (if specified)
 
 Credential handling:
 
@@ -94,14 +103,18 @@ Useful flags:
 
 ## Camera API used
 
-The integration now calls your endpoint format:
+The integration calls these endpoints:
 
-- `GET /x/json-motor.cgi?d=g&x=<value>&y=<value>`
-- `GET /x/json-imp.cgi?cmd=ircut&val=<0|1>`
-- `GET /x/json-heartbeat.cgi`
+- `POST /x/login.cgi` (authentication - session token)
+  - Payload: `{"username": "<username>", "password": "<password>"}`
+  - Returns: `Set-Cookie: thingino_session=<token>`
+- `GET /x/json-motor.cgi?d=g&x=<value>&y=<value>` (motor control)
+- `GET /x/json-imp.cgi?cmd=ircut&val=<0|1>` (IR cut filter)
+- `GET /x/json-heartbeat.cgi` (status information)
 
-The request is sent to the configured camera host and includes your configured auth header
-(default header name is `Authorization`).
+The request is sent to the configured camera host and includes either:
+- Session cookie: `Cookie: thingino_session=<token>` (default for current firmware)
+- Or your configured auth header (legacy support)
 
 Current directional mapping in `custom_components/thingino_motor_control/const.py`:
 

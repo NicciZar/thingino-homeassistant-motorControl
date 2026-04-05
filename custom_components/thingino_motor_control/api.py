@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import base64
 from urllib.parse import urlsplit
 
 from aiohttp import ClientError, ClientTimeout
@@ -23,6 +22,7 @@ from .const import (
     DEFAULT_STEP_SIZE,
     HEARTBEAT_ENDPOINT_PATH,
     IMP_ENDPOINT_PATH,
+    LOGIN_ENDPOINT_PATH,
     MOTOR_ENDPOINT_PATH,
 )
 
@@ -38,6 +38,7 @@ class CameraMotorClient:
         self._auth_header_value: str | None = config.get(CONF_AUTH_HEADER_VALUE)
         self._username: str | None = config.get(CONF_USERNAME)
         self._password: str | None = config.get(CONF_PASSWORD)
+        self._session_token: str | None = None
 
     @property
     def _base_url(self) -> str:
@@ -73,22 +74,20 @@ class CameraMotorClient:
         """Build authorization headers for the request.
 
         Priority:
-        1) Explicit auth header value (for advanced use)
-        2) Generated Basic token from username/password
+        1) Session cookie (Thingino token-based auth)
+        2) Explicit auth header value (for advanced use)
         """
         headers: dict[str, str] = {}
 
+        # If we have a session token, use Cookie header
+        if self._session_token:
+            headers["Cookie"] = f"thingino_session={self._session_token}"
+            return headers
+
+        # Custom auth header for advanced use cases
         if self._auth_header_name and self._auth_header_value:
             headers[self._auth_header_name] = self._auth_header_value.strip()
             return headers
-
-        has_basic_credentials = bool(self._username or self._password)
-        if has_basic_credentials:
-            token = base64.b64encode(
-                f"{self._username or ''}:{self._password or ''}".encode("utf-8")
-            ).decode("ascii")
-            header_name = self._auth_header_name or DEFAULT_AUTH_HEADER_NAME
-            headers[header_name] = f"Basic {token}"
 
         return headers
 
@@ -123,14 +122,62 @@ class CameraMotorClient:
             "val": resolved_value,
         }
 
+    async def _login(self) -> None:
+        """Authenticate with the camera and store the session token."""
+        if not self._username or not self._password:
+            raise HomeAssistantError("Username and password are required for session-based authentication")
+
+        session = async_get_clientsession(self._hass)
+        url = f"{self._base_url.rstrip('/')}/{LOGIN_ENDPOINT_PATH.lstrip('/')}"
+        
+        payload = {
+            "username": self._username,
+            "password": self._password,
+        }
+
+        try:
+            response = await session.post(
+                url,
+                json=payload,
+                headers={"Content-Type": "application/json"},
+                timeout=ClientTimeout(total=8),
+            )
+        except ClientError as err:
+            raise HomeAssistantError(f"Could not reach camera login API at {url}: {err}") from err
+
+        if response.status >= 400:
+            body = await response.text()
+            raise HomeAssistantError(
+                f"Camera login failed with status {response.status}: {body}"
+            )
+
+        # Extract session token from Set-Cookie header
+        set_cookie = response.headers.get("Set-Cookie", "")
+        if "thingino_session=" not in set_cookie:
+            raise HomeAssistantError("Camera did not return a session token")
+
+        # Parse the session token from the cookie
+        for cookie_part in set_cookie.split(";"):
+            if "thingino_session=" in cookie_part:
+                self._session_token = cookie_part.split("=", 1)[1].strip()
+                break
+
+        if not self._session_token:
+            raise HomeAssistantError("Failed to extract session token from response")
+
     async def _send_get(
         self,
         endpoint_path: str,
         params: dict | None = None,
         *,
         expect_json: bool = False,
+        retry_on_auth_failure: bool = True,
     ) -> dict | None:
         """Call a camera API endpoint with query params."""
+        # Ensure we're authenticated if using session-based auth
+        if self._username and self._password and not self._session_token:
+            await self._login()
+
         session = async_get_clientsession(self._hass)
         url = f"{self._base_url.rstrip('/')}/{endpoint_path.lstrip('/')}"
         headers = self._build_headers()
@@ -144,6 +191,17 @@ class CameraMotorClient:
             )
         except ClientError as err:
             raise HomeAssistantError(f"Could not reach camera API at {url}: {err}") from err
+
+        # Handle authentication failure by re-logging in and retrying once
+        if response.status in (401, 403) and retry_on_auth_failure and self._username and self._password:
+            self._session_token = None  # Clear expired token
+            await self._login()
+            return await self._send_get(
+                endpoint_path,
+                params,
+                expect_json=expect_json,
+                retry_on_auth_failure=False,  # Prevent infinite retry loop
+            )
 
         if response.status >= 400:
             body = await response.text()
