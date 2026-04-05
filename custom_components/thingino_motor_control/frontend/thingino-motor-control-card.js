@@ -260,6 +260,12 @@ class ThinginoMotorControlCard extends HTMLElement {
     // Keep the switch state in sync with the last command sent.
     this._irEnabled = enabled;
     this._render();
+    
+    // Refresh heartbeat to sync actual camera state
+    if (this._config.show_heartbeat) {
+      // Small delay to allow camera to process the change
+      setTimeout(() => this._fetchHeartbeat(), 500);
+    }
   }
 
   _setMicEnabled(enabled) {
@@ -275,6 +281,12 @@ class ThinginoMotorControlCard extends HTMLElement {
     // Keep the switch state in sync with the last command sent.
     this._micEnabled = enabled;
     this._render();
+    
+    // Refresh heartbeat to sync actual camera state
+    if (this._config.show_heartbeat) {
+      // Small delay to allow camera to process the change
+      setTimeout(() => this._fetchHeartbeat(), 500);
+    }
   }
 
   _setSpeakerEnabled(enabled) {
@@ -290,6 +302,12 @@ class ThinginoMotorControlCard extends HTMLElement {
     // Keep the switch state in sync with the last command sent.
     this._speakerEnabled = enabled;
     this._render();
+    
+    // Refresh heartbeat to sync actual camera state
+    if (this._config.show_heartbeat) {
+      // Small delay to allow camera to process the change
+      setTimeout(() => this._fetchHeartbeat(), 500);
+    }
   }
 
   _extractServiceResponse(result) {
@@ -415,6 +433,20 @@ class ThinginoMotorControlCard extends HTMLElement {
     const subtitleFont = this._compactMode ? "0.75rem" : "0.8rem";
     const subtitleMargin = this._compactMode ? 8 : 12;
     const irRowFont = this._compactMode ? "0.75rem" : "0.8rem";
+    
+    // Sync IR, microphone, and speaker state from heartbeat data if available
+    if (this._heartbeatData) {
+      if (this._heartbeatData.ircut_state !== undefined) {
+        this._irEnabled = isIrEnabledFromMode(this._heartbeatData.ircut_state);
+      }
+      if (this._heartbeatData.mic_enabled !== undefined) {
+        this._micEnabled = this._heartbeatData.mic_enabled === true || this._heartbeatData.mic_enabled === "true" || this._heartbeatData.mic_enabled === 1;
+      }
+      if (this._heartbeatData.spk_enabled !== undefined) {
+        this._speakerEnabled = this._heartbeatData.spk_enabled === true || this._heartbeatData.spk_enabled === "true" || this._heartbeatData.spk_enabled === 1;
+      }
+    }
+    
     const irIcon = this._irEnabled ? "mdi:weather-night" : "mdi:white-balance-sunny";
     const irState = this._irEnabled ? "Enabled" : "Disabled";
     const micIcon = this._micEnabled ? "mdi:microphone" : "mdi:microphone-off";
